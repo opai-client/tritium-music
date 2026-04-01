@@ -2,6 +2,11 @@ package tritium;
 
 import lombok.Getter;
 import today.opai.api.OpenAPI;
+import tritium.management.AbstractManager;
+import tritium.management.FontManager;
+
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * @author IzumiiKonata
@@ -15,17 +20,35 @@ public class TritiumMusicExtension {
 
     @Getter
     private static final TritiumMusicExtension instance = new TritiumMusicExtension();
+    private static Thread mainThread;
+
+    @Getter
+    private FontManager fontManager;
 
     public TritiumMusicExtension() {
-
+        mainThread = Thread.currentThread();
     }
 
     public void init(OpenAPI openAPI) {
         System.out.println("Hello, Opai!");
+        openAPI.registerEvent(TritiumEventHandler.getInstance());
+
+        this.fontManager = new FontManager();
+
+        List<AbstractManager> managers = Arrays.asList(this.fontManager);
+
+        for (AbstractManager manager : managers) {
+//            logger.debug("calling init() on {}...", manager.getName());
+            manager.init();
+        }
     }
 
     public void unload() {
 
+    }
+
+    public static boolean isCallingFromMainThread() {
+        return Thread.currentThread() == mainThread;
     }
 
 }

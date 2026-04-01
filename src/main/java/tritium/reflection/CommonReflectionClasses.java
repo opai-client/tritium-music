@@ -23,12 +23,10 @@ public class CommonReflectionClasses {
 
     public final Lazy<Class<?>> Minecraft = Lazy.of(
             () -> ClassFinder.finder()
-
                     .addField(Logger.class, PRIVATE | STATIC | FINAL)
                     .addField(Thread.class, PRIVATE | FINAL)
                     .addField(boolean.class, PUBLIC | VOLATILE)
                     .addField(int.class, PRIVATE | STATIC)
-
                     .find()
     );
 
