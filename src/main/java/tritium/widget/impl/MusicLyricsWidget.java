@@ -136,15 +136,15 @@ public class MusicLyricsWidget extends ExtensionModule implements SharedConstant
                     int leftEndIdx = wordInfo.currentIndex;
                     int rightStartIdx = wordInfo.currentIndex + 1;
 
-                    if (rightStartIdx == 1) {
-                        LyricLine.Word current = currentLine.words.get(wordInfo.currentIndex);
-                        double value = (songProgress - current.timestamp) / (double) (current.duration);
-
-                        if (value < 0) {
-                            rightStartIdx -= 1;
-                            leftEndIdx -= 1;
-                        }
-                    }
+//                    if (rightStartIdx == 1) {
+//                        LyricLine.Word current = currentLine.words.get(wordInfo.currentIndex);
+//                        double value = (songProgress - current.timestamp) / (double) (current.duration);
+//
+//                        if (value < 0) {
+//                            rightStartIdx -= 1;
+//                            leftEndIdx -= 1;
+//                        }
+//                    }
 
                     for (int i = 0; i <= leftEndIdx - 1; i++) {
                         left += currentLine.words.get(i).word;
@@ -153,9 +153,14 @@ public class MusicLyricsWidget extends ExtensionModule implements SharedConstant
                     LyricLine.Word current = currentLine.words.get(wordInfo.currentIndex);
                     double value = Math.clamp((songProgress - current.timestamp) / (double) (current.duration), 0, 1);
 
+                    String word = current.word;
+
                     if (value > 0) {
-                        left += current.word.substring(0, (int) (current.word.length() * value));
-                        right += current.word.substring((int) (current.word.length() * value));
+                        int endIndex = word.length() > 1 ? (int) (word.length() * value) : 1;
+                        left += word.substring(0, endIndex);
+                        right += word.substring(endIndex);
+                    } else {
+                        right += word;
                     }
 
                     for (int i = rightStartIdx; i < currentLine.words.size(); i++) {
