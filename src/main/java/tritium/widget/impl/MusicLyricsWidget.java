@@ -121,6 +121,8 @@ public class MusicLyricsWidget extends ExtensionModule implements SharedConstant
 
                     if (i > 0)
                         currentLine = CloudMusic.lyrics.get(i - 1);
+                    else if (i + 1 < CloudMusic.lyrics.size())
+                        currentLine = CloudMusic.lyrics.get(i + 1);
                 }
 
                 if (CloudMusic.haveNoWords) {

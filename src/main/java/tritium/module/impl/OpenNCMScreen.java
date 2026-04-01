@@ -21,11 +21,11 @@ public class OpenNCMScreen extends ExtensionModule implements SharedConstants, E
         this.addValues(this.boundaries, this.lyricDebug);
 
         this.boundaries.setValueCallback(b -> ClientSettings.SHOW_WIDGET_BOUNDARY = b);
-        this.boundaries.setValueCallback(b -> ClientSettings.DEBUG_MODE = b);
+        this.lyricDebug.setValueCallback(b -> ClientSettings.DEBUG_MODE = b);
     }
 
-    public BooleanValue boundaries = api.getValueManager().createBoolean("Show UI Widget Boundary", true);
-    public BooleanValue lyricDebug = api.getValueManager().createBoolean("Per-word lyrics debug", true);
+    public BooleanValue boundaries = api.getValueManager().createBoolean("Show UI Widget Boundary", false);
+    public BooleanValue lyricDebug = api.getValueManager().createBoolean("Per-word lyrics debug", false);
 
     @Override
     public void onTick() {

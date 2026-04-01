@@ -227,6 +227,7 @@ public class NCMScreen extends ExtensionScreen implements SharedConstants, Share
 
         api.getGLStateManager().popMatrix();
         CursorUtils.setOverride();
+        api.getGLStateManager().enableTexture2D();
     }
 
     public boolean downloading = false;
