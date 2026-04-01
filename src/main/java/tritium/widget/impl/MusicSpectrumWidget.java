@@ -54,6 +54,7 @@ public class MusicSpectrumWidget extends ExtensionModule implements SharedConsta
 
         indicator.setHiddenPredicate(() -> !Objects.equals(style.getValue(), "Rect"));
         rectColor.setHiddenPredicate(() -> !Objects.equals(style.getValue(), "Rect"));
+        rectColor.setAlphaAllowed(true);
         
         this.addValues(style, compatMode, indicator, rectColor, multiplier);
 
@@ -118,16 +119,23 @@ public class MusicSpectrumWidget extends ExtensionModule implements SharedConsta
                 api.getGLStateManager().disableTexture2D();
                 api.getGLStateManager().tryBlendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ZERO);
 
-//                int zLayerFixer = 100;
-//                api.getGLStateManager().translate(0, 0, -zLayerFixer);
+                int zLayerFixer = 100;
+                api.getGLStateManager().translate(0, 0, -zLayerFixer);
 
+//                api.getGLStateManager().translate(0, 0, -500);
+
+//                GL11.glDepthMask(false);
+//                GL11.glDepthFunc(GL11.GL_ALWAYS);
 
                 GL11.glBegin(GL11.GL_TRIANGLES);
                 int step = compatMode ? 8 : 3;
                 spectrumWidth.set((compatMode ? this.getWidth() : RenderSystem.getWidth()) / ((double) renderSpectrum.length / step));
                 this.drawRect(spectrumWidth.get(), renderSpectrum.length, step);
                 GL11.glEnd();
-//                api.getGLStateManager().translate(0, 0, zLayerFixer);
+
+//                GL11.glDepthFunc(GL11.GL_LEQUAL);
+//                GL11.glDepthMask(true);
+                api.getGLStateManager().translate(0, 0, zLayerFixer);
             }
 
             if (line) {

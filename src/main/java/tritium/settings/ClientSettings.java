@@ -6,7 +6,7 @@ package tritium.settings;
  */
 public class ClientSettings {
 
-    public static final boolean SHOW_WIDGET_BOUNDARY = false;
+    public static final boolean SHOW_WIDGET_BOUNDARY = true;
     public static final boolean DEBUG_MODE = true;
     public static final boolean IN_GAME_IME = true;
     public static final boolean FIXED_SCALE = true;

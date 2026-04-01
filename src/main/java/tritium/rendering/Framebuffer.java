@@ -369,7 +369,7 @@ public class Framebuffer implements SharedConstants {
         this.unbindFramebuffer();
     }
 
-    private static Framebuffer mcFramebuffer;
+    private static Framebuffer mcFramebuffer = new Framebuffer(1, -1);
 
     public static Framebuffer getMcFramebuffer() {
         return mcFramebuffer;
@@ -379,11 +379,21 @@ public class Framebuffer implements SharedConstants {
 
     public static void updateMcFramebuffer() {
         if (currentlyBinding == null || (lastDisplayWidth != Display.getWidth() || lastDisplayHeight != Display.getHeight())) {
-            lastDisplayWidth =  Display.getWidth();
+            lastDisplayWidth = Display.getWidth();
             lastDisplayHeight = Display.getHeight();
+
             int fbo = GL11.glGetInteger(GL30.GL_FRAMEBUFFER_BINDING);
-            int texId = GL30.glGetFramebufferAttachmentParameteri(GL30.GL_FRAMEBUFFER, OpenGlHelper.GL_COLOR_ATTACHMENT0, GL30.GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
-            mcFramebuffer = new Framebuffer(fbo, texId);
+            int texId = GL30.glGetFramebufferAttachmentParameteri(
+                    GL30.GL_FRAMEBUFFER,
+                    OpenGlHelper.GL_COLOR_ATTACHMENT0,
+                    GL30.GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME
+            );
+
+            mcFramebuffer.framebufferObject = fbo;
+            mcFramebuffer.framebufferTexture = texId;
+            mcFramebuffer.framebufferWidth = Display.getWidth();
+            mcFramebuffer.framebufferHeight = Display.getHeight();
+
             currentlyBinding = mcFramebuffer;
             System.out.println("fbo = " + fbo + ", texId = " + texId);
         }

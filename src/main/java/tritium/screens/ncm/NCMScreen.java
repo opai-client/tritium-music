@@ -18,6 +18,7 @@ import tritium.rendering.ui.widgets.RectWidget;
 import tritium.screens.ncm.panels.ControlsBar;
 import tritium.screens.ncm.panels.HomePanel;
 import tritium.screens.ncm.panels.NavigateBar;
+import tritium.utils.cursor.CursorUtils;
 import tritium.utils.other.multithreading.MultiThreadingUtil;
 
 import java.util.ArrayList;
@@ -136,6 +137,8 @@ public class NCMScreen extends ExtensionScreen implements SharedConstants, Share
 
         alpha = Interpolations.interpolate(alpha, closing ? 0f : 1f, 0.4f);
 
+        CursorUtils.resetOverride();
+
 //        Shaders.GAUSSIAN_BLUR_SHADER.run(Collections.singletonList(() -> {
 //            Rect.draw(0, 0, RenderSystem.getWidth(), RenderSystem.getHeight(), hexColor(1, 1, 1, alpha));
 //        }));
@@ -223,6 +226,7 @@ public class NCMScreen extends ExtensionScreen implements SharedConstants, Share
         this.renderDownloadingPanel();
 
         api.getGLStateManager().popMatrix();
+        CursorUtils.setOverride();
     }
 
     public boolean downloading = false;
