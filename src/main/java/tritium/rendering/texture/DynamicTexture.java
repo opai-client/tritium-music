@@ -213,7 +213,7 @@ public class DynamicTexture extends AbstractTexture {
     }
 
     @SneakyThrows
-    private static BufferedImage readImage(InputStream is) {
+    public static BufferedImage readImage(InputStream is) {
         return ImageIO.read(is);
     }
 }

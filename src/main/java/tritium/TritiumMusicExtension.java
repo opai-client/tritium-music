@@ -6,6 +6,9 @@ import today.opai.api.OpenAPI;
 import tritium.management.AbstractManager;
 import tritium.management.FontManager;
 import tritium.rendering.ime.IME;
+import tritium.widget.impl.MusicInfoWidget;
+import tritium.widget.impl.MusicLyricsWidget;
+import tritium.widget.impl.MusicSpectrumWidget;
 
 import java.util.Arrays;
 import java.util.List;
@@ -27,13 +30,16 @@ public class TritiumMusicExtension {
     @Getter
     private FontManager fontManager;
 
+    public MusicInfoWidget musicInfo = new MusicInfoWidget();
+    public MusicLyricsWidget musicLyrics = new MusicLyricsWidget();
+    public MusicSpectrumWidget musicSpectrum = new MusicSpectrumWidget();
+
     public TritiumMusicExtension() {
         mainThread = Thread.currentThread();
     }
 
-    public void init(OpenAPI openAPI) {
-        System.out.println("Hello, Opai!");
-        openAPI.registerEvent(TritiumEventHandler.getInstance());
+    public void init(OpenAPI api) {
+        api.registerEvent(TritiumEventHandler.getInstance());
 
         this.fontManager = new FontManager();
 
@@ -43,6 +49,13 @@ public class TritiumMusicExtension {
 //            logger.debug("calling init() on {}...", manager.getName());
             manager.init();
         }
+
+        api.registerFeature(this.musicInfo);
+        api.registerFeature(this.musicInfo.widget);
+        api.registerFeature(this.musicLyrics);
+        api.registerFeature(this.musicLyrics.widget);
+        api.registerFeature(this.musicSpectrum);
+        api.registerFeature(this.musicSpectrum.widget);
 
         IngameIMEJNI.loadNative();
         if (IngameIMEJNI.supported)

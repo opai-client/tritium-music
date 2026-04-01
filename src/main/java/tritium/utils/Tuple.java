@@ -1,16 +1,18 @@
 package tritium.utils;
 
 import lombok.Getter;
+import lombok.Setter;
 
 /**
  * @author IzumiiKonata
  * Date: 2025/5/10 10:39
  */
 @Getter
+@Setter
 public class Tuple<A, B> {
 
-    public final A a;
-    public final B b;
+    private A a;
+    private B b;
 
     public Tuple(A a, B b) {
         this.a = a;
