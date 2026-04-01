@@ -25,7 +25,7 @@ public class TritiumMusicExtension {
 
     public static final String NAME = "Tritium Music";
     public static final String AUTHOR = "IzumiiKonata";
-    public static final String VERSION = "1.0";
+    public static final String VERSION = "1.0.1";
 
     @Getter
     private static final TritiumMusicExtension instance = new TritiumMusicExtension();
