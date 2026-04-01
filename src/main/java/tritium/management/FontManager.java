@@ -22,11 +22,10 @@ public class FontManager extends AbstractManager {
         super("FontManager");
     }
 
-    public static CFontRenderer pf12bold, pf14bold, pf16bold, pf18bold, pf20bold, pf25bold, pf28bold, pf34bold, pf40bold, pf65bold, pf50bold, pf100bold;
-    public static CFontRenderer pf12, pf14, pf16, pf18, pf20, pf25, pf28, pf32, pf40;
-    public static CFontRenderer music16, music18, music30, music36, music40, music42;
-
-    public static CFontRenderer googleSans16, googleSans18, googleSans16Bold, googleSans18Bold, product18, tahoma18;
+    public static CFontRenderer pf12bold, pf14bold, pf16bold, pf18bold, pf20bold, pf25bold, pf28bold, pf34bold, pf40bold, pf65bold, pf50bold;
+    public static CFontRenderer pf12, pf14, pf18, pf20, pf25, pf32;
+    public static CFontRenderer icon30;
+    public static CFontRenderer music18, music40;
 
     public static List<CFontRenderer> getAllFontRenderers() {
 
@@ -56,12 +55,9 @@ public class FontManager extends AbstractManager {
 
         pf12 = create(12, normalName);
         pf14 = create(14, normalName);
-        pf16 = create(16, normalName);
         pf20 = create(20, normalName);
         pf25 = create(25, normalName);
-        pf28 = create(28, normalName);
         pf32 = create(32, normalName);
-        pf40 = create(40, normalName);
         pf18 = create(18, normalName);
 
         pf12bold = create(12, boldName);
@@ -75,21 +71,11 @@ public class FontManager extends AbstractManager {
         pf40bold = create(40, boldName);
         pf50bold = create(50, boldName);
         pf65bold = create(65, boldName);
-        pf100bold = create(100, boldName);
 
-        music16 = create(16, "music");
+        icon30 = create(30, "icomoon");
+
         music18 = create(18, "music");
-        music30 = create(30, "music");
-        music36 = create(36, "music");
         music40 = create(40, "music");
-        music42 = create(42, "music");
-
-        googleSans16 = create(16, "googlesans");
-        googleSans18 = create(18, "googlesans");
-        googleSans16Bold = create(16, "googlesansbold");
-        googleSans18Bold = create(18, "googlesansbold");
-        product18 = create(18, "product");
-        tahoma18 = create(18, "tahoma");
     }
 
     @SneakyThrows

@@ -126,7 +126,7 @@ public class MusicLyricsWidget extends ExtensionModule implements SharedConstant
                 }
 
                 if (CloudMusic.haveNoWords) {
-                    System.setProperty("ncm.dynIslandLyrics", currentLine.getLyric());
+                    System.setProperty("ncm.dynIslandLyrics", EnumChatColor.WHITE + currentLine.getLyric());
                 } else {
                     WordInfo wordInfo = calculateCurrentWordInfo(currentLine, songProgress);
 
@@ -160,6 +160,8 @@ public class MusicLyricsWidget extends ExtensionModule implements SharedConstant
                 System.setProperty("ncm.dynIslandLyrics", "");
             }
         } else {
+            System.setProperty("ncm.dynIslandLyrics", "");
+
             api.getGLStateManager().pushMatrix();
 
             StencilClipManager.beginClip(() -> Rect.draw(wpsInterface.getX() - 2, wpsInterface.getY(), wpsInterface.getWidth() + 4, wpsInterface.getHeight(), -1));
