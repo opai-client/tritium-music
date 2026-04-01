@@ -82,7 +82,15 @@ public class RenderSystem implements SharedConstants {
         });
     }
     
-    static final boolean FIXED_SCALE = true;
+    public static boolean FIXED_SCALE = false;
+
+    public static double getWidthNotScaled() {
+        return width;
+    }
+
+    public static double getHeightNotScaled() {
+        return height;
+    }
 
     public static double getWidth() {
         if (!FIXED_SCALE) {
@@ -289,7 +297,7 @@ public class RenderSystem implements SharedConstants {
     }
 
     public static Framebuffer createFrameBuffer(Framebuffer framebuffer) {
-        return createFrameBuffer(framebuffer, width, height);
+        return createFrameBuffer(framebuffer, Display.getWidth(), Display.getHeight());
     }
 
     public static Framebuffer createFrameBuffer(Framebuffer framebuffer, int width, int height) {

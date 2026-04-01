@@ -73,13 +73,12 @@ public class ScrollText implements SharedConstants {
             api.getGLStateManager().matrixMode(GL11.GL_PROJECTION);
             api.getGLStateManager().pushMatrix();
             api.getGLStateManager().loadIdentity();
-            api.getGLStateManager().ortho(0.0D, Display.getWidth() * .5, Display.getHeight() * .5, 0.0D, 1000.0D, 3000.0D);
+
+            api.getGLStateManager().ortho(0.0D, (double) Display.getWidth() * .5, (double) Display.getHeight() * .5, 0.0D, 1000.0D, 3000.0D);
             api.getGLStateManager().matrixMode(GL11.GL_MODELVIEW);
             api.getGLStateManager().pushMatrix();
             api.getGLStateManager().loadIdentity();
             api.getGLStateManager().translate(0.0F, 0.0F, -2000.0F);
-
-//            GL11.glDisable(GL11.GL_STENCIL_TEST);
 
             fb = RenderSystem.createFrameBuffer(fb);
             fb.bindFramebuffer(true);

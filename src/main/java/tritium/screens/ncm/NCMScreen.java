@@ -131,7 +131,7 @@ public class NCMScreen extends ExtensionScreen implements SharedConstants, Share
     }
 
     @Override
-    public void drawScreen(int mouseX, int mouseY) {
+    public void drawScreen(int mX, int mY) {
         if (closing && alpha <= 0.02f)
             api.displayScreen(null);
 
@@ -147,7 +147,14 @@ public class NCMScreen extends ExtensionScreen implements SharedConstants, Share
 
         int dWheel = Mouse.getDWheel();
 
+        RenderSystem.FIXED_SCALE = true;
         api.getGLStateManager().pushMatrix();
+        double xScale = RenderSystem.getWidthNotScaled() / RenderSystem.getWidth();
+        double yScale = RenderSystem.getHeightNotScaled() / RenderSystem.getHeight();
+        double mouseX = mX / xScale;
+        double mouseY = mY / yScale;
+        api.getGLStateManager().scale(xScale, yScale, 1);
+
         this.scaleAtPos(RenderSystem.getWidth() * .5, RenderSystem.getHeight() * .5, 0.9 + (alpha * 0.1));
 
         this.basePanel.setBounds(this.getPanelWidth(), this.getPanelHeight());
@@ -226,8 +233,10 @@ public class NCMScreen extends ExtensionScreen implements SharedConstants, Share
         this.renderDownloadingPanel();
 
         api.getGLStateManager().popMatrix();
+        RenderSystem.FIXED_SCALE = false;
         CursorUtils.setOverride();
         api.getGLStateManager().enableTexture2D();
+
     }
 
     public boolean downloading = false;
@@ -329,7 +338,13 @@ public class NCMScreen extends ExtensionScreen implements SharedConstants, Share
     }
 
     @Override
-    public void mouseClicked(int mouseX, int mouseY, int mouseButton) {
+    public void mouseClicked(int mX, int mY, int mouseButton) {
+
+        double xScale = RenderSystem.getWidthNotScaled() / (RenderSystem.getFixedWidth() * .5);
+        double yScale = RenderSystem.getHeightNotScaled() / (RenderSystem.getFixedHeight() * .5);
+        double mouseX = mX / xScale;
+        double mouseY = mY / yScale;
+
         if (musicLyricsPanel == null) {
             this.basePanel.onMouseClickReceived(mouseX, mouseY, mouseButton);
 
