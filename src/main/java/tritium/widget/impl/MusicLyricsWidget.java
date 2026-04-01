@@ -146,8 +146,16 @@ public class MusicLyricsWidget extends ExtensionModule implements SharedConstant
                         }
                     }
 
-                    for (int i = 0; i <= leftEndIdx; i++) {
+                    for (int i = 0; i <= leftEndIdx - 1; i++) {
                         left += currentLine.words.get(i).word;
+                    }
+
+                    LyricLine.Word current = currentLine.words.get(wordInfo.currentIndex);
+                    double value = Math.clamp((songProgress - current.timestamp) / (double) (current.duration), 0, 1);
+
+                    if (value > 0) {
+                        left += current.word.substring(0, (int) (current.word.length() * value));
+                        right += current.word.substring((int) (current.word.length() * value));
                     }
 
                     for (int i = rightStartIdx; i < currentLine.words.size(); i++) {

@@ -219,8 +219,8 @@ public class Framebuffer implements SharedConstants {
 
     public void bindFramebuffer(boolean p_147610_1_) {
 
-//        if (this == currentlyBinding && currentlyBinding != mcFramebuffer)
-//            return;
+        if (this == currentlyBinding && currentlyBinding != mcFramebuffer)
+            return;
 
         if (currentlyBinding != null) {
             currentlyBinding.saveStencilState();
