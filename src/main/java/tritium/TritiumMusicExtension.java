@@ -1,9 +1,11 @@
 package tritium;
 
+import ingameime.IngameIMEJNI;
 import lombok.Getter;
 import today.opai.api.OpenAPI;
 import tritium.management.AbstractManager;
 import tritium.management.FontManager;
+import tritium.rendering.ime.IME;
 
 import java.util.Arrays;
 import java.util.List;
@@ -41,6 +43,10 @@ public class TritiumMusicExtension {
 //            logger.debug("calling init() on {}...", manager.getName());
             manager.init();
         }
+
+        IngameIMEJNI.loadNative();
+        if (IngameIMEJNI.supported)
+            IME.createInputCtx();
     }
 
     public void unload() {

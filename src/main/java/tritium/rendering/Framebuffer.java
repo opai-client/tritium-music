@@ -362,4 +362,8 @@ public class Framebuffer implements SharedConstants {
         this.framebufferClearNoBinding();
         this.unbindFramebuffer();
     }
+
+    public static Framebuffer getMcFramebuffer() {
+        throw new RuntimeException("Not Implemented");
+    }
 }

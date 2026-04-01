@@ -25,6 +25,10 @@ public class Lazy<T> implements Supplier<T> {
         }
     }
 
+    public T getValue() {
+        return this.get();
+    }
+
     public static <T> Lazy<T> of(final Supplier<T> supplier) {
         return new Lazy<>(supplier);
     }
