@@ -61,8 +61,18 @@ public class HomePanel extends NCMPanel {
                         continue;
                     }
 
-                    JsonObject playList = element.getAsJsonObject();
-                    playLists.add(JsonUtils.parse(playList, PlayList.class));
+                    JsonObject obj = element.getAsJsonObject();
+
+                    // fix for missing @SerializedName(..., alternate = {})
+                    if (obj.has("picUrl")) {
+                        obj.addProperty("coverImgUrl", obj.get("picUrl").getAsString());
+                    }
+
+                    if (obj.has("playcount")) {
+                        obj.addProperty("playCount", obj.get("playcount").getAsLong());
+                    }
+
+                    playLists.add(JsonUtils.parse(obj, PlayList.class));
                 }
 
                 layout();

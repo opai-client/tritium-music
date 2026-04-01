@@ -25,13 +25,13 @@ public class PlayList {
     @SerializedName("name")
     private final String name;
 
-    @SerializedName(value = "coverImgUrl", alternate = { "picUrl" })
+    @SerializedName(value = "coverImgUrl")
     private final String coverUrl;
 
     @SerializedName("trackCount")
     private final int count;
 
-    @SerializedName(value = "playCount", alternate = { "playcount" })
+    @SerializedName(value = "playCount")
     private final long playCount;
 
     @SerializedName("creator")

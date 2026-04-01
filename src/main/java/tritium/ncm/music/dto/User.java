@@ -46,7 +46,17 @@ public class User {
 
         List<PlayList> playLists = new ArrayList<>();
         data.get("playlist").getAsJsonArray().forEach(playList -> {
-            PlayList parse = JsonUtils.parse(playList.getAsJsonObject(), PlayList.class);
+            JsonObject obj = playList.getAsJsonObject();
+            // fix for missing @SerializedName(..., alternate = {})
+            if (obj.has("picUrl")) {
+                obj.addProperty("coverImgUrl", obj.get("picUrl").getAsString());
+            }
+
+            if (obj.has("playcount")) {
+                obj.addProperty("playCount", obj.get("playcount").getAsLong());
+            }
+
+            PlayList parse = JsonUtils.parse(obj, PlayList.class);
             playLists.add(parse);
         });
 
