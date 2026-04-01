@@ -24,9 +24,7 @@ public class FontManager extends AbstractManager {
 
     public static CFontRenderer pf12bold, pf14bold, pf16bold, pf18bold, pf20bold, pf25bold, pf28bold, pf34bold, pf40bold, pf65bold, pf50bold, pf100bold;
     public static CFontRenderer pf12, pf14, pf16, pf18, pf20, pf25, pf28, pf32, pf40;
-    public static CFontRenderer icon18, icon25, icon30, icon40, tritium24, tritium42;
     public static CFontRenderer music16, music18, music30, music36, music40, music42;
-    public static CFontRenderer arial14, arial18bold, arial40bold, arial60bold;
 
     public static CFontRenderer googleSans16, googleSans18, googleSans16Bold, googleSans18Bold, product18, tahoma18;
 
@@ -64,9 +62,6 @@ public class FontManager extends AbstractManager {
         pf28 = create(28, normalName);
         pf32 = create(32, normalName);
         pf40 = create(40, normalName);
-
-        tritium42 = create(42, "tritium");
-        arial60bold = create(60, "arialBold");
         pf18 = create(18, normalName);
 
         pf12bold = create(12, boldName);
@@ -81,17 +76,6 @@ public class FontManager extends AbstractManager {
         pf50bold = create(50, boldName);
         pf65bold = create(65, boldName);
         pf100bold = create(100, boldName);
-
-        icon18 = create(18, "icomoon");
-        icon25 = create(25, "icomoon");
-        icon30 = create(30, "icomoon");
-        icon40 = create(40, "icomoon");
-
-        tritium24 = create(24, "tritium");
-
-        arial14 = create(14, "arial");
-        arial18bold = create(18, "arialBold");
-        arial40bold = create(40, "arialBold");
 
         music16 = create(16, "music");
         music18 = create(18, "music");
