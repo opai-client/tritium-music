@@ -44,7 +44,6 @@ public class TritiumMusicExtension {
     public void init(OpenAPI api) {
         api.registerEvent(TritiumEventHandler.getInstance());
 
-        OpenGlHelper.initialize();
         MultiThreadingUtil.runAsync(CloudMusic::initNCM);
         Reflection.init(api);
 //        Framebuffer.updateMcFramebuffer();
