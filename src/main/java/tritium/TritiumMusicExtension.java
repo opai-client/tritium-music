@@ -6,6 +6,7 @@ import tritium.management.AbstractManager;
 import tritium.management.FontManager;
 import tritium.module.impl.OpenNCMScreen;
 import tritium.ncm.music.CloudMusic;
+import tritium.reflection.Reflection;
 import tritium.rendering.Framebuffer;
 import tritium.rendering.OpenGlHelper;
 import tritium.utils.other.multithreading.MultiThreadingUtil;
@@ -45,6 +46,7 @@ public class TritiumMusicExtension {
 
         OpenGlHelper.initialize();
         MultiThreadingUtil.runAsync(CloudMusic::initNCM);
+        Reflection.init(api);
 //        Framebuffer.updateMcFramebuffer();
 
         this.fontManager = new FontManager();

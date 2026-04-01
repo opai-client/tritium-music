@@ -1,5 +1,6 @@
 package tritium.widget.impl;
 
+import today.opai.api.enums.EnumChatColor;
 import today.opai.api.enums.EnumModuleCategory;
 import today.opai.api.features.ExtensionModule;
 import today.opai.api.features.ExtensionWidget;
@@ -12,6 +13,7 @@ import tritium.interfaces.SharedConstants;
 import tritium.interfaces.SharedRenderingConstants;
 import tritium.management.FontManager;
 import tritium.ncm.music.CloudMusic;
+import tritium.reflection.Reflection;
 import tritium.rendering.RGBA;
 import tritium.rendering.Rect;
 import tritium.rendering.StencilClipManager;
@@ -50,17 +52,19 @@ public class MusicLyricsWidget extends ExtensionModule implements SharedConstant
     public BooleanValue showTranslation = api.getValueManager().createBoolean("Show Translation", true);
     public BooleanValue graceScroll = api.getValueManager().createBoolean("Elegant Scrolling", true);
     public BooleanValue showRoman = api.getValueManager().createBoolean("Show Romanization in Japanese songs", false);
+    public BooleanValue dynIsland = api.getValueManager().createBoolean("Dynamic Island Lyrics", false);
 
     public ExtensionWidget widget;
     WidgetWrapper.WidgetPosSizeInterface wpsInterface;
     
     public MusicLyricsWidget() {
-        super("MusicLyrics", "Show lyrics.", EnumModuleCategory.VISUAL);
+        super("Music Lyrics", "Show lyrics.", EnumModuleCategory.VISUAL);
 
         graceScroll.setHiddenPredicate(() -> singleLine.getValue());
         showRoman.setHiddenPredicate(() -> !showTranslation.getValue());
+        dynIsland.setHiddenPredicate(() -> !Reflection.DYNAMIC_ISLAND_SUPPORTED);
         
-        this.addValues(scrollEffects, alignMode, width, height, lyricHeight, shadow, singleLine, graceScroll, showRoman);
+        this.addValues(scrollEffects, alignMode, width, height, lyricHeight, shadow, singleLine, graceScroll, showRoman, dynIsland);
 
         Tuple<ExtensionWidget, WidgetWrapper.WidgetPosSizeInterface> wrapped = WidgetWrapper.createWrapper(this, this::onRender);
         this.widget = wrapped.getA();
@@ -107,14 +111,62 @@ public class MusicLyricsWidget extends ExtensionModule implements SharedConstant
 
         updateScrollOffset(shouldNotDisplayOtherLyrics);
 
-        api.getGLStateManager().pushMatrix();
+        if (Reflection.DYNAMIC_ISLAND_SUPPORTED && dynIsland.getValue()) {
+//            String property = System.getProperty("ncm.dynIslandLyrics");
+            LyricLine currentLine = CloudMusic.currentLyric;
+            if (currentLine != null) {
 
-        StencilClipManager.beginClip(() -> Rect.draw(wpsInterface.getX() - 2, wpsInterface.getY(), wpsInterface.getWidth() + 4, wpsInterface.getHeight(), -1));
+                if (currentLine.isBreakLine) {
+                    int i = CloudMusic.lyrics.indexOf(currentLine);
 
-        renderAllLyrics(shouldNotDisplayOtherLyrics, songProgress);
+                    if (i > 0)
+                        currentLine = CloudMusic.lyrics.get(i - 1);
+                }
 
-        cleanupRender();
-        StencilClipManager.endClip();
+                if (CloudMusic.haveNoWords) {
+                    System.setProperty("ncm.dynIslandLyrics", currentLine.getLyric());
+                } else {
+                    WordInfo wordInfo = calculateCurrentWordInfo(currentLine, songProgress);
+
+                    String left = EnumChatColor.WHITE + "";
+                    String right = EnumChatColor.GRAY + "";
+
+                    int leftEndIdx = wordInfo.currentIndex;
+                    int rightStartIdx = wordInfo.currentIndex + 1;
+
+                    if (rightStartIdx == 1) {
+                        LyricLine.Word current = currentLine.words.get(wordInfo.currentIndex);
+                        double value = (songProgress - current.timestamp) / (double) (current.duration);
+
+                        if (value < 0) {
+                            rightStartIdx -= 1;
+                            leftEndIdx -= 1;
+                        }
+                    }
+
+                    for (int i = 0; i <= leftEndIdx; i++) {
+                        left += currentLine.words.get(i).word;
+                    }
+
+                    for (int i = rightStartIdx; i < currentLine.words.size(); i++) {
+                        right += currentLine.words.get(i).word;
+                    }
+
+                    System.setProperty("ncm.dynIslandLyrics", left + right);
+                }
+            } else {
+                System.setProperty("ncm.dynIslandLyrics", "");
+            }
+        } else {
+            api.getGLStateManager().pushMatrix();
+
+            StencilClipManager.beginClip(() -> Rect.draw(wpsInterface.getX() - 2, wpsInterface.getY(), wpsInterface.getWidth() + 4, wpsInterface.getHeight(), -1));
+
+            renderAllLyrics(shouldNotDisplayOtherLyrics, songProgress);
+
+            cleanupRender();
+            StencilClipManager.endClip();
+        }
 
         if (ClientSettings.DEBUG_MODE) {
             LyricLine currentLine = CloudMusic.currentLyric;
