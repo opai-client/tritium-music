@@ -30,6 +30,8 @@ import tritium.rendering.texture.DynamicTexture;
 import tritium.rendering.texture.Textures;
 import tritium.screens.ncm.LyricLine;
 import tritium.screens.ncm.LyricParser;
+import tritium.screens.ncm.MusicLyricsPanel;
+import tritium.screens.ncm.NCMScreen;
 import tritium.utils.Location;
 import tritium.utils.Tuple;
 import tritium.utils.json.JsonUtils;

@@ -829,4 +829,17 @@ public class CFontRenderer implements Closeable, SharedConstants {
         return this.getStringWidth(text);
     }
 
+    public float drawString(String text, double x, double y, double scale, int color) {
+
+        api.getGLStateManager().pushMatrix();
+
+        api.getGLStateManager().translate(x, y, 0);
+        api.getGLStateManager().scale(scale, scale, 1);
+
+        float f = drawString(text, 0, 0, color);
+
+        api.getGLStateManager().popMatrix();
+        return f;
+    }
+
 }

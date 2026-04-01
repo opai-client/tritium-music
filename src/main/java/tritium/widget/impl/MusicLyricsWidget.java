@@ -3,6 +3,7 @@ package tritium.widget.impl;
 import today.opai.api.enums.EnumModuleCategory;
 import today.opai.api.features.ExtensionModule;
 import today.opai.api.features.ExtensionWidget;
+import today.opai.api.interfaces.EventHandler;
 import today.opai.api.interfaces.modules.values.BooleanValue;
 import today.opai.api.interfaces.modules.values.ModeValue;
 import today.opai.api.interfaces.modules.values.NumberValue;
@@ -27,7 +28,7 @@ import tritium.utils.math.Mth;
  * @author IzumiiKonata
  * Date: 2025/2/14 20:34
  */
-public class MusicLyricsWidget extends ExtensionModule implements SharedConstants, SharedRenderingConstants {
+public class MusicLyricsWidget extends ExtensionModule implements SharedConstants, SharedRenderingConstants, EventHandler {
 
     static double scrollOffset = 0;
 
@@ -64,6 +65,7 @@ public class MusicLyricsWidget extends ExtensionModule implements SharedConstant
         Tuple<ExtensionWidget, WidgetWrapper.WidgetPosSizeInterface> wrapped = WidgetWrapper.createWrapper(this, this::onRender);
         this.widget = wrapped.getA();
         this.wpsInterface = wrapped.getB();
+        this.setEventHandler(this);
     }
 
     public static void resetProgress(float progress) {
@@ -107,7 +109,7 @@ public class MusicLyricsWidget extends ExtensionModule implements SharedConstant
 
         api.getGLStateManager().pushMatrix();
 
-        StencilClipManager.beginClip(() -> Rect.draw(wpsInterface.getX() - 2, wpsInterface.getY(), this.getWidth() + 4, this.getHeight(), -1));
+        StencilClipManager.beginClip(() -> Rect.draw(wpsInterface.getX() - 2, wpsInterface.getY(), wpsInterface.getWidth() + 4, wpsInterface.getHeight(), -1));
 
         renderAllLyrics(shouldNotDisplayOtherLyrics, songProgress);
 
@@ -154,7 +156,7 @@ public class MusicLyricsWidget extends ExtensionModule implements SharedConstant
     }
 
     private void renderAllLyrics(boolean shouldNotDisplayOtherLyrics, float songProgress) {
-        double offsetY = wpsInterface.getY() + this.getHeight() / 2.0 - getFontRenderer().getHeight() / 2.0 - scrollOffset;
+        double offsetY = wpsInterface.getY() + wpsInterface.getHeight() / 2.0 - getFontRenderer().getHeight() / 2.0 - scrollOffset;
         int indexOf = CloudMusic.lyrics.indexOf(CloudMusic.currentLyric);
 
         synchronized (CloudMusic.lyrics) {
@@ -197,7 +199,7 @@ public class MusicLyricsWidget extends ExtensionModule implements SharedConstant
         LyricRenderInfo info = new LyricRenderInfo();
 
         if (!singleLineMode) {
-            double dest = wpsInterface.getY() + this.getHeight() / 2.0 - getFontRenderer().getHeight() / 2.0 +
+            double dest = wpsInterface.getY() + wpsInterface.getHeight() / 2.0 - getFontRenderer().getHeight() / 2.0 +
                     index * getLyricHeight() - (currentIndex * getLyricHeight());
 
             if (line.offsetY == Double.MIN_VALUE || Math.abs(line.offsetY - dest) > 100) {
@@ -210,7 +212,7 @@ public class MusicLyricsWidget extends ExtensionModule implements SharedConstant
                 return info;
             }
 
-            if (offsetY > wpsInterface.getY() + this.getHeight()) {
+            if (offsetY > wpsInterface.getY() + wpsInterface.getHeight()) {
                 info.shouldBreak = true;
                 return info;
             }
@@ -219,8 +221,8 @@ public class MusicLyricsWidget extends ExtensionModule implements SharedConstant
 
             info.yPosition = this.graceScroll.getValue() ? line.offsetY : offsetY;
         } else {
-            info.yPosition = wpsInterface.getY() + this.getHeight() / 2.0 - getFontRenderer().getHeight() / 2.0;
-            line.offsetY = wpsInterface.getY() + this.getHeight() / 2.0 - getFontRenderer().getHeight() / 2.0;
+            info.yPosition = wpsInterface.getY() + wpsInterface.getHeight() / 2.0 - getFontRenderer().getHeight() / 2.0;
+            line.offsetY = wpsInterface.getY() + wpsInterface.getHeight() / 2.0 - getFontRenderer().getHeight() / 2.0;
         }
 
         return info;
@@ -237,7 +239,7 @@ public class MusicLyricsWidget extends ExtensionModule implements SharedConstant
         } catch (Exception ignored) {}
 
         if (prevLrc != null) {
-            double prevDest = wpsInterface.getY() + this.getHeight() / 2.0 - getFontRenderer().getHeight() / 2.0 +
+            double prevDest = wpsInterface.getY() + wpsInterface.getHeight() / 2.0 - getFontRenderer().getHeight() / 2.0 +
                     (index - 1) * getLyricHeight() - (currentIndex * getLyricHeight());
             double v = prevLrc.offsetY - prevDest;
 
@@ -316,7 +318,7 @@ public class MusicLyricsWidget extends ExtensionModule implements SharedConstant
                 }
                 break;
             case "Center":
-                double centerX = wpsInterface.getX() + this.getWidth() / 2.0;
+                double centerX = wpsInterface.getX() + wpsInterface.getWidth() / 2.0;
                 if (shouldRender) {
                     bigFrStringCentered(line.getLyric(), centerX, y, hexColor);
                 }
@@ -328,11 +330,11 @@ public class MusicLyricsWidget extends ExtensionModule implements SharedConstant
             case "Right":
                 if (shouldRender) {
                     bigFrString(line.getLyric(),
-                            wpsInterface.getX() + this.getWidth() - getFontRenderer().getStringWidthD(line.getLyric()), y, hexColor);
+                            wpsInterface.getX() + wpsInterface.getWidth() - getFontRenderer().getStringWidthD(line.getLyric()), y, hexColor);
                 }
                 if (!secondaryLyricEmpty) {
                     smallFrString(secondaryLyric,
-                            wpsInterface.getX() + this.getWidth() - getSmallFontRenderer().getStringWidthD(secondaryLyric),
+                            wpsInterface.getX() + wpsInterface.getWidth() - getSmallFontRenderer().getStringWidthD(secondaryLyric),
                             y + getFontRenderer().getHeight() + 2, rgb);
                 }
                 break;
@@ -485,8 +487,8 @@ public class MusicLyricsWidget extends ExtensionModule implements SharedConstant
         return switch (alignMode) {
             case "Left" -> wpsInterface.getX();
             case "Center" ->
-                    wpsInterface.getX() + this.getWidth() / 2.0f - getFontRenderer().getStringWidthD(text) / 2.0f;
-            case "Right" -> wpsInterface.getX() + this.getWidth() - getFontRenderer().getStringWidthD(text);
+                    wpsInterface.getX() + wpsInterface.getWidth() / 2.0f - getFontRenderer().getStringWidthD(text) / 2.0f;
+            case "Right" -> wpsInterface.getX() + wpsInterface.getWidth() - getFontRenderer().getStringWidthD(text);
             default -> throw new IllegalStateException("Unexpected value: " + alignMode);
         };
     }
@@ -494,8 +496,8 @@ public class MusicLyricsWidget extends ExtensionModule implements SharedConstant
     private double calculateSlideInTargetX(LyricLine line, String alignMode) {
         return switch (alignMode) {
             case "Left" -> wpsInterface.getX();
-            case "Center" -> wpsInterface.getX() + this.getWidth() / 2.0 - line.targetOffsetX / 2.0;
-            case "Right" -> wpsInterface.getX() + this.getWidth() - line.targetOffsetX;
+            case "Center" -> wpsInterface.getX() + wpsInterface.getWidth() / 2.0 - line.targetOffsetX / 2.0;
+            case "Right" -> wpsInterface.getX() + wpsInterface.getWidth() - line.targetOffsetX;
             default -> throw new IllegalStateException("Unexpected value: " + alignMode);
         };
     }
@@ -503,9 +505,9 @@ public class MusicLyricsWidget extends ExtensionModule implements SharedConstant
     private void renderAlignedText(String text, double y, int color, String alignMode) {
         switch (alignMode) {
             case "Left" -> bigFrString(text, wpsInterface.getX(), y, color);
-            case "Center" -> bigFrStringCentered(text, wpsInterface.getX() + this.getWidth() / 2.0, y, color);
+            case "Center" -> bigFrStringCentered(text, wpsInterface.getX() + wpsInterface.getWidth() / 2.0, y, color);
             case "Right" ->
-                    bigFrString(text, wpsInterface.getX() + this.getWidth() - getFontRenderer().getStringWidthD(text), y, color);
+                    bigFrString(text, wpsInterface.getX() + wpsInterface.getWidth() - getFontRenderer().getStringWidthD(text), y, color);
         }
     }
 

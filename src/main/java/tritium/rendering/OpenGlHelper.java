@@ -1,15 +1,10 @@
 package tritium.rendering;
 
-import com.sun.jna.platform.win32.Advapi32Util;
 import org.lwjgl.opengl.*;
 
 import java.nio.ByteBuffer;
-import java.nio.FloatBuffer;
-import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.List;
-
-import static com.sun.jna.platform.win32.WinReg.HKEY_LOCAL_MACHINE;
 
 public class OpenGlHelper {
     public static boolean nvidia;
@@ -86,7 +81,7 @@ public class OpenGlHelper {
     /**
      * Initializes the texture constants to be used when rendering lightmap values
      */
-    public static void initializeTextures() {
+    public static void initialize() {
         ContextCapabilities contextcapabilities = GLContext.getCapabilities();
         arbMultitexture = contextcapabilities.GL_ARB_multitexture && !contextcapabilities.OpenGL13;
         boolean arbTextureEnvCombine = contextcapabilities.GL_ARB_texture_env_combine && !contextcapabilities.OpenGL13;

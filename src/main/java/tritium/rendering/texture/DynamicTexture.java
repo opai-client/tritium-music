@@ -42,35 +42,24 @@ public class DynamicTexture extends AbstractTexture {
 
     public DynamicTexture(BufferedImage bufferedImage) {
         this(bufferedImage.getWidth(), bufferedImage.getHeight(), bufferedImage.getType());
-        if (alphaTexture)
-            extractAlphaData(bufferedImage);
-        else
-            bufferedImage.getRGB(0, 0, bufferedImage.getWidth(), bufferedImage.getHeight(), this.dynamicTextureData, 0, bufferedImage.getWidth());
+        bufferedImage.getRGB(0, 0, bufferedImage.getWidth(), bufferedImage.getHeight(), this.dynamicTextureData, 0, bufferedImage.getWidth());
         this.updateDynamicTexture();
     }
 
     public DynamicTexture(BufferedImage bufferedImage, boolean clearable) {
         this(bufferedImage.getWidth(), bufferedImage.getHeight(), bufferedImage.getType());
-        if (alphaTexture)
-            extractAlphaData(bufferedImage);
-        else
-            bufferedImage.getRGB(0, 0, bufferedImage.getWidth(), bufferedImage.getHeight(), this.dynamicTextureData, 0, bufferedImage.getWidth());
+        bufferedImage.getRGB(0, 0, bufferedImage.getWidth(), bufferedImage.getHeight(), this.dynamicTextureData, 0, bufferedImage.getWidth());
         this.clearable = clearable;
         this.updateDynamicTexture();
     }
 
     public DynamicTexture(BufferedImage bufferedImage, boolean clearable, boolean linear) {
         this(bufferedImage.getWidth(), bufferedImage.getHeight(), bufferedImage.getType());
-        if (alphaTexture)
-            extractAlphaData(bufferedImage);
-        else
-            bufferedImage.getRGB(0, 0, bufferedImage.getWidth(), bufferedImage.getHeight(), this.dynamicTextureData, 0, bufferedImage.getWidth());
+        bufferedImage.getRGB(0, 0, bufferedImage.getWidth(), bufferedImage.getHeight(), this.dynamicTextureData, 0, bufferedImage.getWidth());
         this.clearable = clearable;
         this.linear = linear;
         this.updateDynamicTexture();
     }
-
-    private boolean alphaTexture = false;
 
     public DynamicTexture(int textureWidth, int textureHeight) {
         this(textureWidth, textureHeight, BufferedImage.TYPE_INT_ARGB);
@@ -80,9 +69,6 @@ public class DynamicTexture extends AbstractTexture {
         this.width = textureWidth;
         this.height = textureHeight;
         this.dynamicTextureData = new int[textureWidth * textureHeight];
-
-        if (imgType == BufferedImage.TYPE_BYTE_GRAY)
-            alphaTexture = true;
 
         this.allocateTexture(textureWidth, textureHeight);
     }
@@ -123,11 +109,7 @@ public class DynamicTexture extends AbstractTexture {
         }
 
         for (int i = 0; i <= levels; ++i) {
-            if (alphaTexture) {
-                GL11.glTexImage2D(GL11.GL_TEXTURE_2D, i, GL11.GL_ALPHA, width >> i, height >> i, 0, GL11.GL_ALPHA, GL11.GL_UNSIGNED_BYTE, (IntBuffer) null);
-            } else {
-                GL11.glTexImage2D(GL11.GL_TEXTURE_2D, i, GL11.GL_RGBA, width >> i, height >> i, 0, GL12.GL_BGRA, GL12.GL_UNSIGNED_INT_8_8_8_8_REV, (IntBuffer) null);
-            }
+            GL11.glTexImage2D(GL11.GL_TEXTURE_2D, i, GL11.GL_RGBA, width >> i, height >> i, 0, GL12.GL_BGRA, GL12.GL_UNSIGNED_INT_8_8_8_8_REV, (IntBuffer) null);
         }
 
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
@@ -155,13 +137,15 @@ public class DynamicTexture extends AbstractTexture {
         TextureUtil.setTextureClamped(false);
 
         int maxBufferSize = 2097152;
-        int bytesPerPixel = alphaTexture ? 1 : 4;
+        int bytesPerPixel = 4;
         int maxPixels = maxBufferSize / bytesPerPixel;
         int chunkHeight = Math.max(1, Math.min(maxPixels / width, height));
 
         int optimalBufferSize = width * chunkHeight * bytesPerPixel;
 
         ByteBuffer dataBuffer = ByteBuffer.allocateDirect(optimalBufferSize);
+
+        GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 4);
 
         try {
             int[] aint = this.dynamicTextureData;
@@ -173,27 +157,18 @@ public class DynamicTexture extends AbstractTexture {
 
                 dataBuffer.clear();
 
-                if (alphaTexture) {
-                    for (int i = 0; i < pixelCount; i++) {
-                        int pixel = aint[k + i];
-                        dataBuffer.put((byte) ((pixel >> 24) & 0xFF));
-                    }
-                } else {
-                    for (int i = 0; i < pixelCount; i++) {
-                        int pixel = aint[k + i];
-                        dataBuffer.putInt(pixel);
-                    }
+                for (int i = 0; i < pixelCount; i++) {
+                    int pixel = aint[k + i];
+                    dataBuffer.put((byte) (pixel & 0xFF));
+                    dataBuffer.put((byte) ((pixel >> 8) & 0xFF));
+                    dataBuffer.put((byte) ((pixel >> 16) & 0xFF));
+                    dataBuffer.put((byte) ((pixel >> 24) & 0xFF));
                 }
 
                 dataBuffer.flip();
 
-                if (alphaTexture) {
-                    GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, l, width, j,
-                            GL11.GL_ALPHA, GL11.GL_UNSIGNED_BYTE, dataBuffer);
-                } else {
-                    GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, l, width, j,
-                            GL12.GL_BGRA, GL11.GL_UNSIGNED_BYTE, dataBuffer);
-                }
+                GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, l, width, j,
+                        GL12.GL_BGRA, GL11.GL_UNSIGNED_BYTE, dataBuffer);
             }
         } finally {
         }

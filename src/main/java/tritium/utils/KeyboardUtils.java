@@ -80,4 +80,8 @@ public class KeyboardUtils {
         return keyID == 30 && isCtrlKeyDown() && !isShiftKeyDown() && !isAltKeyDown();
     }
 
+    public static boolean isKeyComboCtrl(int pressedKey, int comboKey) {
+        return pressedKey == comboKey && isCtrlKeyDown() && !isShiftKeyDown() && !isAltKeyDown();
+    }
+
 }

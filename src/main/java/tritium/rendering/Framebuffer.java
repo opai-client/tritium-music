@@ -48,6 +48,12 @@ public class Framebuffer implements SharedConstants {
         this.createBindFramebuffer(width, height);
     }
 
+    Framebuffer(int fbo, int fbTexture) {
+        this.useDepth = true;
+        this.framebufferObject = fbo;
+        this.framebufferTexture = fbTexture;
+    }
+
     public void createBindFramebuffer(int width, int height) {
         if (!OpenGlHelper.isFramebufferEnabled()) {
             this.framebufferWidth = width;
@@ -213,8 +219,8 @@ public class Framebuffer implements SharedConstants {
 
     public void bindFramebuffer(boolean p_147610_1_) {
 
-        if (this == currentlyBinding)
-            return;
+//        if (this == currentlyBinding && currentlyBinding != mcFramebuffer)
+//            return;
 
         if (currentlyBinding != null) {
             currentlyBinding.saveStencilState();
@@ -239,7 +245,7 @@ public class Framebuffer implements SharedConstants {
             currentlyBinding.saveStencilState();
         }
 
-        currentlyBinding = null;
+        currentlyBinding = mcFramebuffer;
 
         if (OpenGlHelper.isFramebufferEnabled()) {
             OpenGlHelper.glBindFramebuffer(OpenGlHelper.GL_FRAMEBUFFER, 0);
@@ -363,7 +369,23 @@ public class Framebuffer implements SharedConstants {
         this.unbindFramebuffer();
     }
 
+    private static Framebuffer mcFramebuffer;
+
     public static Framebuffer getMcFramebuffer() {
-        throw new RuntimeException("Not Implemented");
+        return mcFramebuffer;
+    }
+
+    static int lastDisplayWidth = 0, lastDisplayHeight = 0;
+
+    public static void updateMcFramebuffer() {
+        if (currentlyBinding == null || (lastDisplayWidth != Display.getWidth() || lastDisplayHeight != Display.getHeight())) {
+            lastDisplayWidth =  Display.getWidth();
+            lastDisplayHeight = Display.getHeight();
+            int fbo = GL11.glGetInteger(GL30.GL_FRAMEBUFFER_BINDING);
+            int texId = GL30.glGetFramebufferAttachmentParameteri(GL30.GL_FRAMEBUFFER, OpenGlHelper.GL_COLOR_ATTACHMENT0, GL30.GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
+            mcFramebuffer = new Framebuffer(fbo, texId);
+            currentlyBinding = mcFramebuffer;
+            System.out.println("fbo = " + fbo + ", texId = " + texId);
+        }
     }
 }

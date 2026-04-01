@@ -24,12 +24,6 @@ public class GaussianBlurShader extends Shader {
     private Framebuffer outputFramebuffer = new Framebuffer(Display.getWidth(), Display.getHeight(), true);
     private GaussianKernel gaussianKernel = new GaussianKernel(0);
 
-    private Framebuffer cacheBuffer = new Framebuffer(Display.getWidth(), Display.getHeight(), true);
-
-    Timer updateTimer = new Timer();
-
-    boolean cache = false;
-
     private final Uniform1i u_radius = new Uniform1i(blurProgram, "u_radius");
     private final UniformFB u_kernel = new UniformFB(blurProgram, "u_kernel");
 
@@ -91,12 +85,7 @@ public class GaussianBlurShader extends Shader {
             Framebuffer.getMcFramebuffer().bindFramebufferTexture();
             ShaderProgram.drawQuadFlipped();
 
-            if (cache) {
-                cacheBuffer.bindFramebuffer(true);
-                cacheBuffer.framebufferClearNoBinding();
-            } else {
-                Framebuffer.getMcFramebuffer().bindFramebuffer(true);
-            }
+            Framebuffer.getMcFramebuffer().bindFramebuffer(true);
 
             u_direction.setValue(0.0F, compression);
             outputFramebuffer.bindFramebufferTexture();
@@ -124,8 +113,6 @@ public class GaussianBlurShader extends Shader {
             outputFramebuffer.deleteFramebuffer();
             outputFramebuffer = new Framebuffer(Display.getWidth(), Display.getHeight(), true);
 
-            cacheBuffer.deleteFramebuffer();
-            cacheBuffer = new Framebuffer(Display.getWidth(), Display.getHeight(), true);
         } else {
 //            inputFramebuffer.framebufferClear();
 //            outputFramebuffer.framebufferClear();

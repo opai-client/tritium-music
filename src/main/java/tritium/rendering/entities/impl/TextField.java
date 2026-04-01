@@ -2,8 +2,6 @@ package tritium.rendering.entities.impl;
 
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
-import ingameime.IngameIMEJNI;
-import ingameime.PreEditRect;
 import lombok.Getter;
 import lombok.Setter;
 import org.lwjgl.input.Keyboard;
@@ -14,7 +12,6 @@ import tritium.rendering.ChatAllowedCharacters;
 import tritium.rendering.StencilClipManager;
 import tritium.rendering.animation.Interpolations;
 import tritium.rendering.font.CFontRenderer;
-import tritium.rendering.ime.IME;
 import tritium.rendering.rendersystem.RenderSystem;
 import tritium.settings.ClientSettings;
 import tritium.utils.KeyboardUtils;
@@ -607,21 +604,6 @@ public class TextField implements SharedConstants {
             RenderSystem.drawRect(animatedCursorX, posY - 2, animatedCursorX + 0.5f,
                     posY + getFontRenderer().getFontHeight() + 2, 0xffcdcbcd);
         }
-
-        if (IngameIMEJNI.supported && ClientSettings.IN_GAME_IME) {
-            updateIMEPosition(cursorX, (float) posY);
-        }
-    }
-
-    private void updateIMEPosition(float cursorX, float cursorY) {
-        if (imePositionUpdateTimer.isDelayed(100)) {
-            imePositionUpdateTimer.reset();
-            PreEditRect rect = new PreEditRect();
-            double scale = (ClientSettings.FIXED_SCALE ? 1 : RenderSystem.getScaleFactor()) * 2;
-            rect.setX((int) (cursorX * scale));
-            rect.setY((int) ((cursorY + getFontRenderer().getFontHeight()) * scale));
-            IME.InputCtx.setPreEditRect(rect);
-        }
     }
 
     private int applyAlpha(int color, float alpha) {
@@ -661,16 +643,10 @@ public class TextField implements SharedConstants {
             cursorForceShowTimer.reset();
             cursorCounter = 0;
             Keyboard.enableRepeatEvents(true);
-            if (IngameIMEJNI.supported && ClientSettings.IN_GAME_IME) {
-                IME.setActivated(true);
-            }
         }
 
         if (!focused && isFocused) {
             Keyboard.enableRepeatEvents(false);
-            if (IngameIMEJNI.supported && ClientSettings.IN_GAME_IME) {
-                IME.setActivated(false);
-            }
         }
 
         isFocused = focused;

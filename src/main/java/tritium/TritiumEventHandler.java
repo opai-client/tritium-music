@@ -9,7 +9,8 @@ import org.apache.commons.lang3.Validate;
 import org.apache.logging.log4j.Logger;
 import today.opai.api.events.EventRender2D;
 import today.opai.api.interfaces.EventHandler;
-import tritium.management.FontManager;
+import tritium.rendering.Framebuffer;
+import tritium.rendering.animation.Interpolations;
 import tritium.utils.logging.LogManager;
 
 import java.util.Queue;
@@ -84,6 +85,7 @@ public class TritiumEventHandler implements EventHandler {
 
     @Override
     public void onRender2D(EventRender2D event) {
-
+        Framebuffer.updateMcFramebuffer();
+        Interpolations.calcFrameDelta();
     }
 }

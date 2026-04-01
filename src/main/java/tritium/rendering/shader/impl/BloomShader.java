@@ -5,6 +5,7 @@ import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
 import tritium.rendering.Framebuffer;
+import tritium.rendering.Image;
 import tritium.rendering.StencilClipManager;
 import tritium.rendering.shader.Shader;
 import tritium.rendering.shader.ShaderProgram;
@@ -23,11 +24,6 @@ public class BloomShader extends Shader {
     private Framebuffer inputFramebuffer = new Framebuffer(Display.getWidth(), Display.getHeight(), true);
     private Framebuffer outputFramebuffer = new Framebuffer(Display.getWidth(), Display.getHeight(), true);
     private GaussianKernel gaussianKernel = new GaussianKernel(0);
-
-    private Framebuffer cacheBuffer = new Framebuffer(Display.getWidth(), Display.getHeight(), true);
-
-    Timer updateTimer = new Timer();
-    boolean cache = false;
 
     private final Uniform1f u_radius = new Uniform1f(bloomProgram, "u_radius");
     private final UniformFB u_kernel = new UniformFB(bloomProgram, "u_kernel");
@@ -93,15 +89,8 @@ public class BloomShader extends Shader {
             inputFramebuffer.bindFramebufferTexture();
             ShaderProgram.drawQuadFlipped();
 
-            if (cache) {
-                cacheBuffer.bindFramebuffer(true);
-                cacheBuffer.framebufferClearNoBinding();
-                StencilClipManager.disableStencilTest();
-                api.getGLStateManager().tryBlendFuncSeparate(GL11.GL_ONE , GL11.GL_ONE_MINUS_SRC_COLOR, GL11.GL_ONE, GL11.GL_ZERO);
-            } else {
-                Framebuffer.getMcFramebuffer().bindFramebuffer(true);
-                api.getGLStateManager().tryBlendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
-            }
+            Framebuffer.getMcFramebuffer().bindFramebuffer(true);
+            api.getGLStateManager().tryBlendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
 
             u_direction.setValue(0.0F, compression);
             outputFramebuffer.bindFramebufferTexture();
@@ -124,8 +113,6 @@ public class BloomShader extends Shader {
             outputFramebuffer.deleteFramebuffer();
             outputFramebuffer = new Framebuffer(Display.getWidth(), Display.getHeight(), true);
 
-            cacheBuffer.deleteFramebuffer();
-            cacheBuffer = new Framebuffer(Display.getWidth(), Display.getHeight(), true);
         } else {
 //            inputFramebuffer.framebufferClear();
 //            outputFramebuffer.framebufferClear();
@@ -133,7 +120,6 @@ public class BloomShader extends Shader {
 
         inputFramebuffer.setFramebufferColor(0.0F, 0.0F, 0.0F, 0.0F);
         outputFramebuffer.setFramebufferColor(0.0F, 0.0F, 0.0F, 0.0F);
-        cacheBuffer.setFramebufferColor(0, 0, 0, 0.0F);
 
     }
 }

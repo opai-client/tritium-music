@@ -3,6 +3,7 @@ package tritium.widget.impl;
 import today.opai.api.enums.EnumModuleCategory;
 import today.opai.api.features.ExtensionModule;
 import today.opai.api.features.ExtensionWidget;
+import today.opai.api.interfaces.EventHandler;
 import today.opai.api.interfaces.modules.values.BooleanValue;
 import today.opai.api.interfaces.modules.values.NumberValue;
 import tritium.interfaces.SharedConstants;
@@ -30,7 +31,7 @@ import java.time.Duration;
  * @author IzumiiKonata
  * Date: 2025/2/16 14:19
  */
-public class MusicInfoWidget extends ExtensionModule implements SharedConstants, SharedRenderingConstants {
+public class MusicInfoWidget extends ExtensionModule implements SharedConstants, SharedRenderingConstants, EventHandler {
 
     public BooleanValue turnComposerIntoLyric = api.getValueManager().createBoolean("Turn Composer Into Lyric", false);
 
@@ -52,6 +53,7 @@ public class MusicInfoWidget extends ExtensionModule implements SharedConstants,
         });
         
         this.addValues(this.turnComposerIntoLyric, this.volume);
+        this.setEventHandler(this);
     }
 
     float alpha = 0.0f;

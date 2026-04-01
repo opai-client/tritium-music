@@ -4,6 +4,7 @@ import org.lwjgl.opengl.GL11;
 import today.opai.api.enums.EnumModuleCategory;
 import today.opai.api.features.ExtensionModule;
 import today.opai.api.features.ExtensionWidget;
+import today.opai.api.interfaces.EventHandler;
 import today.opai.api.interfaces.modules.values.BooleanValue;
 import today.opai.api.interfaces.modules.values.ColorValue;
 import today.opai.api.interfaces.modules.values.ModeValue;
@@ -29,7 +30,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * @author IzumiiKonata
  * Date: 2025/3/8 16:17
  */
-public class MusicSpectrumWidget extends ExtensionModule implements SharedConstants, SharedRenderingConstants {
+public class MusicSpectrumWidget extends ExtensionModule implements SharedConstants, SharedRenderingConstants, EventHandler {
 
     float[] renderSpectrum = new float[1];
     float[] renderSpectrumIndicator = new float[1];
@@ -59,6 +60,7 @@ public class MusicSpectrumWidget extends ExtensionModule implements SharedConsta
         Tuple<ExtensionWidget, WidgetWrapper.WidgetPosSizeInterface> wrapped = WidgetWrapper.createWrapper(this, this::onRender);
         this.widget = wrapped.getA();
         this.wpsInterface = wrapped.getB();
+        this.setEventHandler(this);
     }
 
     public void onRender() {

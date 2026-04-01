@@ -30,8 +30,8 @@
       <entry exclude="true" path="$USER_HOME$/.m2/repository\org\apache\commons\commons-lang3\3.3.2\commons-lang3-3.3.2.jar" />
       <entry exclude="true" path="$USER_HOME$/.m2/repository\commons-io\commons-io\2.4\commons-io-2.4.jar" />
       <entry exclude="true" path="$USER_HOME$/.m2/repository\commons-codec\commons-codec\1.9\commons-codec-1.9.jar" />
-      <entry exclude="true" path="$USER_HOME$/.m2/repository\com\google\code\gson\gson\2.2.4\gson-2.2.4.jar" />
       <entry path="C:/Users/20307\AppData\Roaming\.opai\bin\libraries_v1_8" />
+      <entry path="$USER_HOME$/.m2/repository\com\google\code\gson\gson\2.8.9\gson-2.8.9.jar" />
       <entry path="C:/Users/20307\AppData\Roaming\.opai\bin\3238e5e51a226f4f1173baf2bdf1bd5fe37d118e" />
     </classpathModifications>
     <option name="MAIN_CLASS_NAME" value="net.minecraft.client.main.Main" />

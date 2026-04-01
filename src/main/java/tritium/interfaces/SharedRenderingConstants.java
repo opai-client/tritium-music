@@ -99,6 +99,18 @@ public interface SharedRenderingConstants {
         return new Color(a.getRed() / 2 + b.getRed() / 2, a.getGreen() / 2 + b.getGreen() / 2, a.getBlue() / 2 + b.getBlue() / 2);
     }
 
+    default void scaleAtPos(double posX, double posY, double scale) {
+        SharedConstants.api.getGLStateManager().translate(posX, posY, 0);
+        SharedConstants.api.getGLStateManager().scale(scale, scale, 1);
+        SharedConstants.api.getGLStateManager().translate(-posX, -posY, 0);
+    }
+
+    default void rotateAtPos(double posX, double posY, float rotate) {
+        SharedConstants.api.getGLStateManager().translate(posX, posY, 0);
+        SharedConstants.api.getGLStateManager().rotate(rotate, 0, 0, 1);
+        SharedConstants.api.getGLStateManager().translate(-posX, -posY, 0);
+    }
+
     default double getWidth() {
         return RenderSystem.getWidth();
     }

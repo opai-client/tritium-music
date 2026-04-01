@@ -67,12 +67,13 @@ public class TextureAtlas implements SharedConstants {
         ByteBuffer buffer = imageToBuffer(image);
 
         api.getGLStateManager().bindTexture(textureId);
+        int alignment = GL11.glGetInteger(GL11.GL_UNPACK_ALIGNMENT);
         GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 1);
         GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0,
                 currentX, currentY,
                 width, height,
                 GL11.GL_ALPHA, GL11.GL_UNSIGNED_BYTE, buffer);
-
+        GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, alignment);
         api.getGLStateManager().bindTexture(0);
 
         float u0 = (float) currentX / ATLAS_SIZE;

@@ -1,11 +1,14 @@
 package tritium;
 
-import ingameime.IngameIMEJNI;
 import lombok.Getter;
 import today.opai.api.OpenAPI;
 import tritium.management.AbstractManager;
 import tritium.management.FontManager;
-import tritium.rendering.ime.IME;
+import tritium.module.impl.OpenNCMScreen;
+import tritium.ncm.music.CloudMusic;
+import tritium.rendering.Framebuffer;
+import tritium.rendering.OpenGlHelper;
+import tritium.utils.other.multithreading.MultiThreadingUtil;
 import tritium.widget.impl.MusicInfoWidget;
 import tritium.widget.impl.MusicLyricsWidget;
 import tritium.widget.impl.MusicSpectrumWidget;
@@ -25,7 +28,6 @@ public class TritiumMusicExtension {
 
     @Getter
     private static final TritiumMusicExtension instance = new TritiumMusicExtension();
-    private static Thread mainThread;
 
     @Getter
     private FontManager fontManager;
@@ -35,11 +37,15 @@ public class TritiumMusicExtension {
     public MusicSpectrumWidget musicSpectrum = new MusicSpectrumWidget();
 
     public TritiumMusicExtension() {
-        mainThread = Thread.currentThread();
+
     }
 
     public void init(OpenAPI api) {
         api.registerEvent(TritiumEventHandler.getInstance());
+
+        OpenGlHelper.initialize();
+        MultiThreadingUtil.runAsync(CloudMusic::initNCM);
+//        Framebuffer.updateMcFramebuffer();
 
         this.fontManager = new FontManager();
 
@@ -50,16 +56,13 @@ public class TritiumMusicExtension {
             manager.init();
         }
 
+        api.registerFeature(new OpenNCMScreen());
         api.registerFeature(this.musicInfo);
         api.registerFeature(this.musicInfo.widget);
         api.registerFeature(this.musicLyrics);
         api.registerFeature(this.musicLyrics.widget);
         api.registerFeature(this.musicSpectrum);
         api.registerFeature(this.musicSpectrum.widget);
-
-        IngameIMEJNI.loadNative();
-        if (IngameIMEJNI.supported)
-            IME.createInputCtx();
     }
 
     public void unload() {
@@ -67,7 +70,7 @@ public class TritiumMusicExtension {
     }
 
     public static boolean isCallingFromMainThread() {
-        return Thread.currentThread() == mainThread;
+        return Thread.currentThread().getName().equals("Client thread");
     }
 
 }
