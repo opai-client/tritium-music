@@ -111,19 +111,27 @@ public class MusicInfoWidget extends ExtensionModule implements SharedConstants,
             api.getGLStateManager().scale(scale, scale, 1);
             api.getGLStateManager().translate(-(posInterface.getX() + posInterface.getWidth() * .5), -(posInterface.getY() + posInterface.getHeight() * .5), 0);
 
-            api.getShaderUtil().pushBloom();
-            this.roundedRect(posInterface.getX(), posInterface.getY(), width, height + downloadProgHeight, bgRound, 1, 0, 0, 0, alpha * 0.5f);
-            api.getShaderUtil().popBloom(3, Color.BLACK);
+            api.getShaderUtil().drawWithBloom(() -> {
+                api.getGLStateManager().pushMatrix();
+
+                api.getGLStateManager().translate(posInterface.getX() + posInterface.getWidth() * .5, posInterface.getY() + posInterface.getHeight() * .5, 0);
+                api.getGLStateManager().scale(scale, scale, 1);
+                api.getGLStateManager().translate(-(posInterface.getX() + posInterface.getWidth() * .5), -(posInterface.getY() + posInterface.getHeight() * .5), 0);
+
+                this.roundedRect(posInterface.getX(), posInterface.getY(), width, height + downloadProgHeight, bgRound, 1, 0, 0, 0, alpha * 0.7f);
+
+                api.getGLStateManager().popMatrix();
+            });
 
             {
 
                 double posX = posInterface.getX();
                 double posY = posInterface.getY();
 
-                Location musicCoverBlured = CloudMusic.currentlyPlaying.getBlurredCoverLocation();
+                Location musicCoverBlurred = CloudMusic.currentlyPlaying.getBlurredCoverLocation();
 
                 TextureManager textureManager = TextureManager.getInstance();
-                ITextureObject texBg = textureManager.getTexture(musicCoverBlured);
+                ITextureObject texBg = textureManager.getTexture(musicCoverBlurred);
 
                 if (texBg != null || prevBlurredBg != null) {
 
