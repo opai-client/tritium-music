@@ -7,6 +7,7 @@ import org.apache.commons.lang3.Validate;
 import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.MissingResourceException;
 
 @Getter
 @EqualsAndHashCode(
@@ -24,7 +25,12 @@ public class Location {
     }
 
     public InputStream getResourceStream() {
-        return Location.class.getResourceAsStream(resourcePath);
+        InputStream stream = Location.class.getResourceAsStream(resourcePath);
+
+        if (stream == null)
+            throw new MissingResourceException(resourcePath + " not found", Location.class.getName(), resourcePath);
+
+        return stream;
     }
 
     public String toString() {

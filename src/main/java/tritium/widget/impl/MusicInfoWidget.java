@@ -106,6 +106,15 @@ public class MusicInfoWidget extends ExtensionModule implements SharedConstants,
 
             api.getGLStateManager().pushMatrix();
 
+            api.getGLStateManager().translate(posInterface.getX() + posInterface.getWidth() * .5, posInterface.getY() + posInterface.getHeight() * .5, 0);
+            double scale = .98 + (alpha * .02);
+            api.getGLStateManager().scale(scale, scale, 1);
+            api.getGLStateManager().translate(-(posInterface.getX() + posInterface.getWidth() * .5), -(posInterface.getY() + posInterface.getHeight() * .5), 0);
+
+            api.getShaderUtil().pushBloom();
+            this.roundedRect(posInterface.getX(), posInterface.getY(), width, height + downloadProgHeight, bgRound, 1, 0, 0, 0, alpha * 0.5f);
+            api.getShaderUtil().popBloom(3, Color.BLACK);
+
             {
 
                 double posX = posInterface.getX();

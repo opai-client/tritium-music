@@ -74,6 +74,7 @@ public class NCMScreen extends ExtensionScreen implements SharedConstants, Share
             this.musicLyricsPanel.onInit();
 
         Keyboard.enableRepeatEvents(true);
+        CursorUtils.setCursor(CursorUtils.ARROW);
     }
 
     public void markDirty() {

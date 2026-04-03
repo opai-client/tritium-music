@@ -33,6 +33,7 @@ public class TritiumMusicExtension {
     @Getter
     private FontManager fontManager;
 
+    public OpenNCMScreen tritiumMusic =  new OpenNCMScreen();
     public MusicInfoWidget musicInfo = new MusicInfoWidget();
     public MusicLyricsWidget musicLyrics = new MusicLyricsWidget();
     public MusicSpectrumWidget musicSpectrum = new MusicSpectrumWidget();
@@ -57,7 +58,7 @@ public class TritiumMusicExtension {
             manager.init();
         }
 
-        api.registerFeature(new OpenNCMScreen());
+        api.registerFeature(this.tritiumMusic);
         api.registerFeature(this.musicInfo);
         api.registerFeature(this.musicInfo.widget);
         api.registerFeature(this.musicLyrics);

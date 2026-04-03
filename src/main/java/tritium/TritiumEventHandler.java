@@ -10,6 +10,7 @@ import org.apache.logging.log4j.Logger;
 import today.opai.api.events.EventRender2D;
 import today.opai.api.interfaces.EventHandler;
 import tritium.rendering.Framebuffer;
+import tritium.rendering.MusicToast;
 import tritium.rendering.animation.Interpolations;
 import tritium.utils.logging.LogManager;
 
@@ -87,5 +88,8 @@ public class TritiumEventHandler implements EventHandler {
     public void onRender2D(EventRender2D event) {
         Framebuffer.updateMcFramebuffer();
         Interpolations.calcFrameDelta();
+
+        if (TritiumMusicExtension.getInstance().tritiumMusic.musicToast.getValue())
+            MusicToast.render();
     }
 }

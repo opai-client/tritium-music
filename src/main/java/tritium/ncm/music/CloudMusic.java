@@ -705,7 +705,7 @@ public class CloudMusic implements SharedConstants {
         
         private void notifySongStart(Music song) {
             MusicToast.pushMusicToast(song.getArtistsName() + " - " + song.getName());
-            System.err.printf("[NCM] Now playing: %s, id %d\n", song.getName(), song.getId());
+            System.out.printf("[NCM] Now playing: %s, id %d\n", song.getName(), song.getId());
         }
         
         private void startPlayback(Music song, Tuple<String, String> playUrl, File musicFile) {

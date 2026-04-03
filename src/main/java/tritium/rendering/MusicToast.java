@@ -31,7 +31,7 @@ public class MusicToast implements SharedRenderingConstants, SharedConstants {
 
     final Lazy<AnimatedTexture> musicNotes = Lazy.of(() -> {
         try {
-            return new AnimatedTexture(Location.of("tritium/textures/hud/music_notes.png"));
+            return new AnimatedTexture(Location.of("/tritium/textures/hud/music_notes.png"));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -106,7 +106,7 @@ public class MusicToast implements SharedRenderingConstants, SharedConstants {
             api.getGLStateManager().enableTexture2D();
 
             if (toastWidth > 120) {
-                TextureManager.getInstance().bindTexture(Location.of("tritium/textures/hud/now_playing.png"));
+                TextureManager.getInstance().bindTexture(Location.of("/tritium/textures/hud/now_playing.png"));
 
                 RenderSystem.color(-1);
 
@@ -125,7 +125,7 @@ public class MusicToast implements SharedRenderingConstants, SharedConstants {
                 Image.drawModalRectWithCustomSizedTexture(offsetX + 4 + count * 112, offsetY, 4, 0, toastWidth - (8 + count * 112), toastHeight, 120, 24);
 
             } else {
-                Image.draw(Location.of("tritium/textures/hud/now_playing.png"), offsetX, offsetY, toastWidth, toastHeight, Image.Type.Normal);
+                Image.draw(Location.of("/tritium/textures/hud/now_playing.png"), offsetX, offsetY, toastWidth, toastHeight, Image.Type.Normal);
             }
 
 

@@ -37,9 +37,6 @@ public class MusicSpectrumWidget extends ExtensionModule implements SharedConsta
 
     Map<Integer, Long> indicatorTimeStamp = new HashMap<>();
 
-    public final ModeValue style = api.getValueManager().createModes("Style", "Rect", new String[] { "Rect", "Line" });
-
-    public final BooleanValue compatMode = api.getValueManager().createBoolean("Compact Mode", false);
     public final BooleanValue indicator = api.getValueManager().createBoolean("Indicator", true);
     public final BooleanValue absVol = api.getValueManager().createBoolean("Absolute Volume", true);
     public final ColorValue rectColor = api.getValueManager().createColor("Rect Color", new Color(125, 125, 125, 200));
@@ -52,11 +49,9 @@ public class MusicSpectrumWidget extends ExtensionModule implements SharedConsta
     public MusicSpectrumWidget() {
         super("Music Spectrum", "Shows spectrum.", EnumModuleCategory.VISUAL);
 
-        indicator.setHiddenPredicate(() -> !Objects.equals(style.getValue(), "Rect"));
-        rectColor.setHiddenPredicate(() -> !Objects.equals(style.getValue(), "Rect"));
         rectColor.setAlphaAllowed(true);
         
-        this.addValues(style, compatMode, indicator, rectColor, multiplier);
+        this.addValues(indicator, rectColor, multiplier);
 
         Tuple<ExtensionWidget, WidgetWrapper.WidgetPosSizeInterface> wrapped = WidgetWrapper.createWrapper(this, this::onRender);
         this.widget = wrapped.getA();
@@ -65,129 +60,60 @@ public class MusicSpectrumWidget extends ExtensionModule implements SharedConsta
     }
 
     public void onRender() {
-        float offset = 170;
-
         AtomicReference<Double> spectrumWidth = new AtomicReference<>(RenderSystem.getWidth() / (double) renderSpectrum.length);
 
         double maximumSpectrum = 1;
 
-        String style = this.style.getValue();
-
-        boolean compatMode = this.compatMode.getValue();
-
         if (CloudMusic.player != null) {
 
-            boolean rect = style.equals("Rect");
-            boolean line = style.equals("Line");
-
-            if (compatMode) {
-                this.roundedRect(wpsInterface.getX(), wpsInterface.getY(), this.getWidth(), this.getHeight(), 6, 0, 0, 0, 0.4f);
+            int leng = (int) (AudioPlayer.bandValues.length * .5);
+            if (renderSpectrum.length != leng) {
+                renderSpectrum = Arrays.copyOf(renderSpectrum, leng);
+                renderSpectrumIndicator = new float[leng];
             }
 
-            if (rect || line) {
+            for (int i = 0; i < leng; i++) {
 
-                int leng = (int) (AudioPlayer.bandValues.length * .5);
-                if (renderSpectrum.length != leng) {
-                    renderSpectrum = Arrays.copyOf(renderSpectrum, leng);
-                    renderSpectrumIndicator = new float[leng];
+                float target = AudioPlayer.bandValues[i] * (16);
+
+                if (!Float.isFinite(target)) {
+                    target = 0;
                 }
 
-                for (int i = 0; i < leng; i++) {
-
-                    float target = AudioPlayer.bandValues[i] * (compatMode ? 8 : 16);
-
-                    if (!Float.isFinite(target)) {
-                        target = 0;
-                    }
-
-                    if (!CloudMusic.player.player.isPlaying()) {
-                        target = 0;
-                    }
-
-                    float factor = 1f;
-                    renderSpectrum[i] = Interpolations.interpolate(renderSpectrum[i], target, (float) (2f - (this.absVol.getValue() ? 0 : .5f * (1 - TritiumMusicExtension.getInstance().musicInfo.volume.getValue()))) * factor);
-                    maximumSpectrum = (Math.max(maximumSpectrum, target));
+                if (!CloudMusic.player.player.isPlaying()) {
+                    target = 0;
                 }
 
+                float factor = 1f;
+                renderSpectrum[i] = Interpolations.interpolate(renderSpectrum[i], target, (float) (2f - (this.absVol.getValue() ? 0 : .5f * (1 - TritiumMusicExtension.getInstance().musicInfo.volume.getValue()))) * factor);
+                maximumSpectrum = (Math.max(maximumSpectrum, target));
             }
 
             api.getGLStateManager().pushMatrix();
 
-            if (rect) {
+            api.getGLStateManager().enableBlend();
+            api.getGLStateManager().disableTexture2D();
+            api.getGLStateManager().tryBlendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ZERO);
 
-                api.getGLStateManager().enableBlend();
-                api.getGLStateManager().disableTexture2D();
-                api.getGLStateManager().tryBlendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ZERO);
-
-                int zLayerFixer = 100;
-                api.getGLStateManager().translate(0, 0, -zLayerFixer);
+            int zLayerFixer = 100;
+            api.getGLStateManager().translate(0, 0, -zLayerFixer);
 
 //                api.getGLStateManager().translate(0, 0, -500);
 
 //                GL11.glDepthMask(false);
 //                GL11.glDepthFunc(GL11.GL_ALWAYS);
 
-                GL11.glBegin(GL11.GL_TRIANGLES);
-                int step = compatMode ? 8 : 3;
-                spectrumWidth.set((compatMode ? this.getWidth() : RenderSystem.getWidth()) / ((double) renderSpectrum.length / step));
-                this.drawRect(spectrumWidth.get(), renderSpectrum.length, step);
-                GL11.glEnd();
+            GL11.glBegin(GL11.GL_TRIANGLES);
+            int step = 3;
+            spectrumWidth.set((RenderSystem.getWidth()) / ((double) renderSpectrum.length / step));
+            this.drawRect(spectrumWidth.get(), renderSpectrum.length, step);
+            GL11.glEnd();
 
 //                GL11.glDepthFunc(GL11.GL_LEQUAL);
 //                GL11.glDepthMask(true);
-                api.getGLStateManager().translate(0, 0, zLayerFixer);
-            }
+            api.getGLStateManager().translate(0, 0, zLayerFixer);
 
-            if (line) {
-                api.getGLStateManager().enableBlend();
-                api.getGLStateManager().tryBlendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ZERO);
-
-                api.getGLStateManager().color(1, 1, 1, 1);
-                api.getGLStateManager().disableTexture2D();
-                GL11.glEnable(GL11.GL_LINE_SMOOTH);
-                GL11.glLineWidth(compatMode ? .75f : 1.0f);
-
-                GL11.glBegin(GL11.GL_LINE_STRIP);
-
-                double shrink = 4;
-                int step = compatMode ? 2 : 1;
-
-                if (compatMode) {
-                    GL11.glVertex2d(wpsInterface.getX() + 4, wpsInterface.getY() + this.getHeight() - shrink);
-                    spectrumWidth.set((this.getWidth() - shrink * 2) / ((double) renderSpectrum.length / step));
-                } else {
-                    GL11.glVertex2d(0, RenderSystem.getHeight());
-                }
-
-                for (int i = 0; i < renderSpectrum.length; i += step) {
-                    api.getGLStateManager().color(1, 1, 1, 1);
-                    double height = -renderSpectrum[i] * this.multiplier.getValue() * 10;
-
-                    if (compatMode)
-                        height = Math.max(height, -this.getHeight() + shrink * 2);
-
-                    GL11.glVertex2d((compatMode ? (wpsInterface.getX() + 4) : 0) + spectrumWidth.get() * (i + 1) / step + spectrumWidth.get() * 0.5, (compatMode ? (wpsInterface.getY() + this.getHeight() - shrink) : RenderSystem.getHeight()) + height);
-                }
-
-                if (compatMode) {
-                    GL11.glVertex2d(wpsInterface.getX() + this.getWidth() - shrink, wpsInterface.getY() + this.getHeight() - shrink);
-                } else {
-                    GL11.glVertex2d(RenderSystem.getWidth(), RenderSystem.getHeight());
-                }
-
-                GL11.glEnd();
-            }
-
-            if (rect) {
-                wpsInterface.setWidth(-1);
-//                this.setHeight(offset);
-            }
-
-            if (compatMode){
-                wpsInterface.setWidth(200);
-                wpsInterface.setHeight(80);
-            }
-
+            wpsInterface.setWidth(-1);
             api.getGLStateManager().popMatrix();
         }
 
@@ -195,17 +121,9 @@ public class MusicSpectrumWidget extends ExtensionModule implements SharedConsta
 
     private void drawRect(double spectrumWidth, int j, int step) {
 
-        boolean compatMode = this.compatMode.getValue();
-
-        double shrink = 4;
-        spectrumWidth -= (compatMode ? shrink * 2 : 0) / ((double) j / step);
-
         for (int i = 0; i < j; i += step) {
 
             double height = -renderSpectrum[i] * this.multiplier.getValue() * 10;
-
-            if (compatMode)
-                height = Math.max(height, -this.getHeight() + shrink * 2);
 
             if (this.indicator.getValue()) {
 
@@ -228,8 +146,8 @@ public class MusicSpectrumWidget extends ExtensionModule implements SharedConsta
                 }
             }
 
-            double posX = (compatMode ? wpsInterface.getX() + shrink : 0) + spectrumWidth * i / step;
-            double y = compatMode ? (wpsInterface.getY() + this.getHeight() - shrink) : RenderSystem.getHeight();
+            double posX = ((double) 0) + spectrumWidth * i / step;
+            double y = RenderSystem.getHeight();
 
             double left = posX;
             double top = y;
