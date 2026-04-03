@@ -228,7 +228,7 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <finalName>tritium-music-${version}</finalName>
+                            <finalName>tritium-music-${project.version}</finalName>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
 
                             <artifactSet>
