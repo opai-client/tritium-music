@@ -59,12 +59,12 @@ public class TritiumMusicExtension {
         }
 
         api.registerFeature(this.tritiumMusic);
+        api.registerFeature(this.musicSpectrum);
+        api.registerFeature(this.musicSpectrum.widget);
         api.registerFeature(this.musicInfo);
         api.registerFeature(this.musicInfo.widget);
         api.registerFeature(this.musicLyrics);
         api.registerFeature(this.musicLyrics.widget);
-        api.registerFeature(this.musicSpectrum);
-        api.registerFeature(this.musicSpectrum.widget);
     }
 
     public void unload() {
