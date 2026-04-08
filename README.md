@@ -7,8 +7,7 @@
 
 ## Screenshots
 
-![gui.png](./res/gui.png)
-![lyrics.png](./res/lyrics.png)
-![dynamicisland.png](./res/dynamicisland.png)
-![widgets.png](./res/widgets.png)
-
+<img width="1920" height="1032" alt="gui" src="https://github.com/user-attachments/assets/5152f057-ebb3-4ca0-a766-2f554df58886" />
+<img width="1920" height="1032" alt="lyrics" src="https://github.com/user-attachments/assets/c014c65a-541b-4e8b-b622-bcdceee343d9" />
+<img width="576" height="98" alt="dynamicisland" src="https://github.com/user-attachments/assets/3cfe0e2f-e29a-40e0-9046-421f5c9f462b" />
+<img width="1920" height="1032" alt="widgets" src="https://github.com/user-attachments/assets/9a78b868-960c-4a51-8cf0-f36e8e29d6de" />
