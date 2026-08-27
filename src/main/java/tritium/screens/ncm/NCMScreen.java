@@ -210,6 +210,9 @@ public class NCMScreen extends ExtensionScreen implements SharedConstants, Share
             Rect.draw(sepX, this.currentPanelBg.getY() + this.currentPanelBg.getHeight(), this.currentPanelBg.getWidth(), 1, hairline);
 
             this.playlistsPanel.renderSuggestionOverlay(mouseX, mouseY);
+            if (this.currentPanel instanceof tritium.screens.ncm.panels.PlaylistPanel playlistPanel) {
+                playlistPanel.renderContextMenuOverlay(mouseX, mouseY);
+            }
         }
 
         if (this.musicLyricsPanel != null) {

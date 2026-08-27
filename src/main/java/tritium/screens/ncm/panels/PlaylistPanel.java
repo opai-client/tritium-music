@@ -10,6 +10,7 @@ import tritium.rendering.TextureManager;
 import tritium.rendering.animation.Interpolations;
 import tritium.rendering.rendersystem.RenderSystem;
 import tritium.rendering.texture.Textures;
+import tritium.rendering.ui.AbstractWidget;
 import tritium.rendering.ui.container.Panel;
 import tritium.rendering.ui.container.ScrollPanel;
 import tritium.rendering.ui.widgets.*;
@@ -438,6 +439,16 @@ public class PlaylistPanel extends NCMPanel {
     public void renderWidget(double mouseX, double mouseY, int dWheel) {
         if (contextMenu.handleWheel(mouseX, mouseY, dWheel)) dWheel = 0;
         super.renderWidget(mouseX, mouseY, dWheel);
+    }
+
+    @Override
+    protected boolean shouldRenderChildren(AbstractWidget<?> child, double mouseX, double mouseY) {
+        return child != contextMenu && super.shouldRenderChildren(child, mouseX, mouseY);
+    }
+
+    public void renderContextMenuOverlay(double mouseX, double mouseY) {
+        contextMenu.setAlpha(getAlpha());
+        contextMenu.renderWidget(mouseX, mouseY, 0);
     }
 
     public void updateSearchResults(List<Music> musics) {
