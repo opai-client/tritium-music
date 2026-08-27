@@ -1,6 +1,6 @@
 package tritium.reflection;
 
-import com.google.common.base.Splitter;
+import com.google.gson.Gson;
 import lombok.SneakyThrows;
 import lombok.experimental.UtilityClass;
 import me.fan87.nativeinstrumentation.NativeInstrumentation;
@@ -16,15 +16,16 @@ import tritium.utils.other.multithreading.MultiThreadingUtil;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.lang.instrument.ClassDefinition;
 import java.lang.instrument.Instrumentation;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import static java.lang.reflect.Modifier.*;
 import static org.objectweb.asm.Opcodes.*;
+import static tritium.reflection.ClassFinder.DONT_CARE;
 
 /**
  * @author IzumiiKonata
@@ -67,19 +68,14 @@ public class Reflection {
     public void initDynIsland() {
 
         try {
+
             DYN_1 = ClassFinder.finder()
 
-                    .addField(Splitter.class, PRIVATE | STATIC | FINAL)
+                    .addField(List.class, PRIVATE | FINAL)
+                    .addField(Gson.class, PRIVATE | STATIC | FINAL)
                     .addField(Logger.class, PRIVATE | STATIC | FINAL)
 
-                    .addMethod(void.class, PUBLIC)
-                    .addMethod(void.class, PUBLIC)
-                    .addMethod(void.class, PUBLIC, Object.class, boolean.class)
-                    .addMethod(void.class, PRIVATE, Object.class)
-
-                    .addMethod(Splitter.class, ClassFinder.DONT_CARE)
-                    .addMethod(Logger.class, ClassFinder.DONT_CARE)
-                    .addMethod(void.class, ClassFinder.DONT_CARE, Object.class, Object.class)
+                    .addMethod(void.class, PRIVATE, Object.class, Object.class)
 
                     .find();
 
@@ -87,11 +83,12 @@ public class Reflection {
                 System.out.println("Found DYN_1: " + DYN_1.getName());
 
             DynamicIslandClass = ClassFinder.finder()
+
                     .addField(DYN_1, PRIVATE | FINAL)
+                    .addField(Object.class, PRIVATE | FINAL)
 
                     .addMethod(boolean.class, PUBLIC)
-                    .addMethod(String.class, PRIVATE | STATIC, byte[].class)
-                    .addMethod(String.class, PRIVATE | STATIC, int.class, long.class)
+                    .addMethod(boolean.class, PUBLIC, Object.class, Object.class)
 
                     .find();
 
@@ -105,26 +102,26 @@ public class Reflection {
             DynamicIslandEntity = ClassFinder.finder()
 
                     .setStrictMode(ClassFinder.Finder.StrictMode.Fields)
-                    .addField(DynamicIslandClass, ClassFinder.DONT_CARE)
-                    .addField(String.class, ClassFinder.DONT_CARE)
-                    .addField(Color.class, ClassFinder.DONT_CARE)
-                    .addField(ResourceLocation, ClassFinder.DONT_CARE)
+                    .addField(DynamicIslandClass, DONT_CARE)
+                    .addField(String.class, DONT_CARE)
+                    .addField(Color.class, DONT_CARE)
+                    .addField(ResourceLocation, DONT_CARE)
 
                     .find();
 
             if (debug)
-                System.out.println("Found DynamicIslandEntity: " + DynamicIslandClass.getName());
+                System.out.println("Found DynamicIslandEntity: " + DynamicIslandEntity.getName());
 
             IResourcePack = ClassFinder.finder()
 
                     .setInterface()
 
-                    .addMethod(InputStream.class, ClassFinder.DONT_CARE, ResourceLocation)
-                    .addMethod(boolean.class, ClassFinder.DONT_CARE, ResourceLocation)
-                    .addMethod(Set.class, ClassFinder.DONT_CARE)
-                    .addMethod(Object.class, ClassFinder.DONT_CARE, Object.class, String.class)
-                    .addMethod(BufferedImage.class, ClassFinder.DONT_CARE)
-                    .addMethod(String.class, ClassFinder.DONT_CARE)
+                    .addMethod(InputStream.class, DONT_CARE, ResourceLocation)
+                    .addMethod(boolean.class, DONT_CARE, ResourceLocation)
+                    .addMethod(Set.class, DONT_CARE)
+                    .addMethod(Object.class, DONT_CARE, Object.class, String.class)
+                    .addMethod(BufferedImage.class, DONT_CARE)
+                    .addMethod(String.class, DONT_CARE)
 
                     .find();
 
