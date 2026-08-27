@@ -40,17 +40,7 @@ public final class I18n {
     }
 
     private static String currentLanguage() {
-        try {
-            Class<?> minecraftClass = Class.forName("net.minecraft.client.Minecraft");
-            Method getMinecraft = minecraftClass.getMethod("getMinecraft");
-            Object minecraft = getMinecraft.invoke(null);
-            Object languageManager = minecraftClass.getMethod("getLanguageManager").invoke(minecraft);
-            Object language = languageManager.getClass().getMethod("getCurrentLanguage").invoke(languageManager);
-            String code = String.valueOf(language.getClass().getMethod("getLanguageCode").invoke(language));
-            return normalize(code);
-        } catch (Exception ignored) {
-            return normalize(Locale.getDefault().toString());
-        }
+        return "zh_cn";
     }
 
     private static String normalize(String language) {
