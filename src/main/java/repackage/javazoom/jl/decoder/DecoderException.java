@@ -50,4 +50,3 @@ public class DecoderException extends JavaLayerException implements DecoderError
         return "Decoder errorCode " + Integer.toHexString(errorcode);
     }
 }
-

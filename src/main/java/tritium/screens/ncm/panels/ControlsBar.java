@@ -1,13 +1,16 @@
 package tritium.screens.ncm.panels;
 
 import org.lwjgl.input.Mouse;
+import tritium.TritiumMusicExtension;
 import tritium.management.FontManager;
 import tritium.ncm.music.AudioPlayer;
 import tritium.ncm.music.CloudMusic;
+import tritium.rendering.animation.Interpolations;
 import tritium.rendering.ui.widgets.*;
 import tritium.screens.ncm.MusicLyricsPanel;
 import tritium.screens.ncm.NCMPanel;
 import tritium.screens.ncm.NCMScreen;
+import tritium.utils.I18n;
 import tritium.widget.impl.MusicLyricsWidget;
 
 import java.awt.*;
@@ -18,6 +21,8 @@ import java.awt.*;
  */
 public class ControlsBar extends NCMPanel {
 
+    private float coverHoverAnim = 0f;
+
     public ControlsBar() {
     }
 
@@ -27,8 +32,8 @@ public class ControlsBar extends NCMPanel {
 
         this.addChild(bg);
 
-        bg.setColor(0xFF1D1D1D)
-          .setAlpha(.95f)
+        bg.setColor(NCMScreen.getColor(NCMScreen.ColorType.GENERIC_BACKGROUND))
+          .setAlpha(.96f)
           .setBeforeRenderCallback(() -> bg.setMargin(0));
 
         RoundedImageWidget playingCover = new RoundedImageWidget(() -> {
@@ -44,10 +49,13 @@ public class ControlsBar extends NCMPanel {
                 .fadeIn()
                 .setLinearFilter(true)
                 .setShouldOverrideMouseCursor(true)
-                .setBeforeRenderCallback(() -> playingCover
-                        .setMargin(5)
-                        .setBounds(playingCover.getHeight(), playingCover.getHeight())
-                        .setRadius(2))
+                .setBeforeRenderCallback(() -> {
+                    coverHoverAnim = Interpolations.interpolate(coverHoverAnim, playingCover.isHovering() ? 1f : 0f, 0.3f);
+                    playingCover
+                            .setMargin(5)
+                            .setBounds(playingCover.getHeight(), playingCover.getHeight())
+                            .setRadius(2);
+                })
                 .setOnClickCallback((relativeX, relativeY, mouseButton) -> {
                     if (CloudMusic.currentlyPlaying != null) {
                         NCMScreen.getInstance().musicLyricsPanel = new MusicLyricsPanel(CloudMusic.currentlyPlaying);
@@ -55,6 +63,12 @@ public class ControlsBar extends NCMPanel {
 
                     return true;
                 });
+
+        playingCover.setTransformations(() -> {
+            if (coverHoverAnim > 0.001f) {
+                playingCover.scaleAtPos(playingCover.getX() + playingCover.getWidth() * 0.5, playingCover.getY() + playingCover.getHeight() * 0.5, 1 + coverHoverAnim * 0.08);
+            }
+        });
 
         double buttonsYOffset = -4;
 
@@ -143,7 +157,8 @@ public class ControlsBar extends NCMPanel {
         this.addChild(progressBarBg);
 
         progressBarBg
-                .setColor(Color.GRAY)
+                .setColor(0xFFFFFFFF)
+                .setAlpha(0.2f)
                 .setRadius(1)
                 .setBounds(135, 3)
                 .setShouldOverrideMouseCursor(true)
@@ -206,7 +221,7 @@ public class ControlsBar extends NCMPanel {
                         .setColor(NCMScreen.getColor(NCMScreen.ColorType.SECONDARY_TEXT))
                         .setPosition(progressBarBg.getRelativeX() + progressBarBg.getWidth() + 4, lblCurTime.getRelativeY()));
 
-        LabelWidget lblMusicName = new LabelWidget(() -> CloudMusic.currentlyPlaying == null ? "未在播放" : CloudMusic.currentlyPlaying.getName(), FontManager.pf14bold);
+        LabelWidget lblMusicName = new LabelWidget(() -> CloudMusic.currentlyPlaying == null ? I18n.get("tritium-music.ui.playback.not_playing") : CloudMusic.currentlyPlaying.getName(), FontManager.pf14bold);
         this.addChild(lblMusicName);
 
         lblMusicName
@@ -223,7 +238,7 @@ public class ControlsBar extends NCMPanel {
         LabelWidget lblMusicArtist = new LabelWidget(
                 () -> {
                     if (CloudMusic.currentlyPlaying == null)
-                        return "无";
+                        return I18n.get("tritium-music.ui.common.none");
                     return CloudMusic.currentlyPlaying.getArtistsName() + " - " + CloudMusic.currentlyPlaying.getAlbum().getName();
                 },
                 FontManager.pf14bold
@@ -240,6 +255,50 @@ public class ControlsBar extends NCMPanel {
                                 playingCover.getRelativeX() + playingCover.getWidth() + 4,
                                 lblMusicArtist.getRelativeY() + lblMusicArtist.getHeight() * .5 + 2
                         ));
+
+        LabelWidget volumeIcon = new LabelWidget("I", FontManager.music18);
+        this.addChild(volumeIcon);
+        volumeIcon
+                .setClickable(false)
+                .setBeforeRenderCallback(() -> volumeIcon
+                        .setColor(NCMScreen.getColor(NCMScreen.ColorType.SECONDARY_TEXT))
+                        .setPosition(this.getWidth() - 112, this.getHeight() * .5 - volumeIcon.getHeight() * .5));
+
+        RoundedRectWidget volumeBarBg = new RoundedRectWidget() {
+            private boolean dragging;
+
+            @Override
+            public void onRender(double mouseX, double mouseY) {
+                super.onRender(mouseX, mouseY);
+                boolean leftDown = Mouse.isButtonDown(0);
+                if (this.testHovered(mouseX, mouseY, 3) && leftDown) dragging = true;
+                if (dragging && leftDown) {
+                    double volume = Math.max(0, Math.min(1, (mouseX - getX()) / getWidth()));
+                    TritiumMusicExtension.getInstance().musicInfo.volume.setValue(volume);
+                } else if (dragging) {
+                    dragging = false;
+                }
+            }
+        };
+        this.addChild(volumeBarBg);
+        volumeBarBg
+                .setColor(0xFFFFFFFF)
+                .setAlpha(.2f)
+                .setRadius(1.5)
+                .setBounds(82, 4)
+                .setShouldOverrideMouseCursor(true)
+                .setBeforeRenderCallback(() -> volumeBarBg
+                        .setPosition(this.getWidth() - 94, this.getHeight() * .5 - volumeBarBg.getHeight() * .5));
+
+        RoundedRectWidget volumeBar = new RoundedRectWidget();
+        volumeBarBg.addChild(volumeBar);
+        volumeBar
+                .setColor(0xFFFFFFFF)
+                .setClickable(false)
+                .setBeforeRenderCallback(() -> volumeBar
+                        .setMargin(0)
+                        .setWidth(volumeBarBg.getWidth() * TritiumMusicExtension.getInstance().musicInfo.volume.getValue())
+                        .setRadius(1.5));
     }
 
     private String formatDuration(float totalMillis) {

@@ -19,6 +19,7 @@ import tritium.screens.ncm.panels.ControlsBar;
 import tritium.screens.ncm.panels.HomePanel;
 import tritium.screens.ncm.panels.NavigateBar;
 import tritium.utils.cursor.CursorUtils;
+import tritium.utils.I18n;
 import tritium.utils.other.multithreading.MultiThreadingUtil;
 
 import java.util.ArrayList;
@@ -112,7 +113,7 @@ public class NCMScreen extends ExtensionScreen implements SharedConstants, Share
 
         this.currentPanelBg.setBeforeRenderCallback(() -> {
             this.currentPanelBg.setBounds(playlistsPanel.getWidth(), 0, this.currentPanelBg.getParentWidth() - playlistsPanel.getWidth(), this.getPanelHeight() * 0.93);
-            this.currentPanelBg.setColor(getColor(ColorType.GENERIC_BACKGROUND));
+            this.currentPanelBg.setColor(getColor(ColorType.ELEMENT_BACKGROUND));
         });
 
         this.controlsBar = new ControlsBar();
@@ -147,6 +148,13 @@ public class NCMScreen extends ExtensionScreen implements SharedConstants, Share
         this.checkDirty();
 
         int dWheel = Mouse.getDWheel();
+
+        double screenWidth = RenderSystem.getWidth();
+        double screenHeight = RenderSystem.getHeight();
+        Rect.draw(0, 0, screenWidth, screenHeight, hexColor(0f, 0f, 0f, alpha * 0.55f));
+        double vignetteHeight = screenHeight * 0.35;
+        RenderSystem.drawGradientRectTopToBottom(0, 0, screenWidth, vignetteHeight, hexColor(0f, 0f, 0f, alpha * 0.28f), hexColor(0f, 0f, 0f, 0f));
+        RenderSystem.drawGradientRectTopToBottom(0, screenHeight - vignetteHeight, screenWidth, screenHeight, hexColor(0f, 0f, 0f, 0f), hexColor(0f, 0f, 0f, alpha * 0.32f));
 
         RenderSystem.FIXED_SCALE = true;
         api.getGLStateManager().pushMatrix();
@@ -195,6 +203,13 @@ public class NCMScreen extends ExtensionScreen implements SharedConstants, Share
             this.controlsBar.setAlpha(alpha);
             this.controlsBar.setBounds(this.currentPanelBg.getX(), this.currentPanelBg.getY() + this.currentPanelBg.getHeight(), this.currentPanelBg.getWidth(), this.getPanelHeight() - this.currentPanelBg.getHeight());
             this.controlsBar.renderWidget(mouseX, mouseY, dWheel);
+
+            int hairline = hexColor(1f, 1f, 1f, alpha * 0.05f);
+            double sepX = this.currentPanelBg.getX();
+            Rect.draw(sepX, this.basePanel.getY(), 1, this.basePanel.getHeight(), hairline);
+            Rect.draw(sepX, this.currentPanelBg.getY() + this.currentPanelBg.getHeight(), this.currentPanelBg.getWidth(), 1, hairline);
+
+            this.playlistsPanel.renderSuggestionOverlay(mouseX, mouseY);
         }
 
         if (this.musicLyricsPanel != null) {
@@ -259,7 +274,7 @@ public class NCMScreen extends ExtensionScreen implements SharedConstants, Share
 
         double offsetY = 8 + -(8 + downloadPanelHeight) * (1 - downloadPanelAlpha);
         Rect.draw(RenderSystem.getWidth() * .5 - downloadPanelWidth * .5, offsetY, downloadPanelWidth, downloadPanelHeight, RenderSystem.reAlpha(0x202020, downloadPanelAlpha * alpha));
-        FontManager.pf34bold.drawCenteredString("Downloading...", RenderSystem.getWidth() * .5, offsetY + 8, hexColor(1, 1, 1, downloadPanelAlpha * alpha));
+        FontManager.pf34bold.drawCenteredString(I18n.get("tritium-music.ui.download.downloading"), RenderSystem.getWidth() * .5, offsetY + 8, hexColor(1, 1, 1, downloadPanelAlpha * alpha));
         FontManager.pf25bold.drawCenteredString(String.valueOf(downloadSpeed), RenderSystem.getWidth() * .5, offsetY + 8 + FontManager.pf34bold.getHeight(), hexColor(1, 1, 1, downloadPanelAlpha * alpha));
         roundedRect(RenderSystem.getWidth() * .5 - progressBarWidth * .5, offsetY + downloadPanelHeight - 8 - progressBarHeight, progressBarWidth, progressBarHeight, 3, hexColor(1, 1, 1, .5f * downloadPanelAlpha * alpha));
 
@@ -347,6 +362,9 @@ public class NCMScreen extends ExtensionScreen implements SharedConstants, Share
         double mouseY = mY / yScale;
 
         if (musicLyricsPanel == null) {
+            if (this.playlistsPanel.handleSuggestionClick(mouseX, mouseY, mouseButton)) {
+                return;
+            }
             this.basePanel.onMouseClickReceived(mouseX, mouseY, mouseButton);
 
             if (this.currentPanel != null)
@@ -393,12 +411,20 @@ public class NCMScreen extends ExtensionScreen implements SharedConstants, Share
     public static int getColor(ColorType type) {
 
         return switch (type) {
-            case GENERIC_BACKGROUND -> 0x1E1E1E;
-            case ELEMENT_BACKGROUND -> 0x232323;
-            case ELEMENT_HOVER -> 0x353535;
-            case PRIMARY_TEXT -> 0xFFFFFF;
-            case SECONDARY_TEXT -> 0x6B6B6B;
+            case GENERIC_BACKGROUND -> 0x0E0F12;
+            case ELEMENT_BACKGROUND -> 0x16171B;
+            case ELEMENT_HOVER -> 0x24262C;
+            case PRIMARY_TEXT -> 0xF2F3F5;
+            case SECONDARY_TEXT -> 0x8A8D94;
         };
 
+    }
+
+    @Override
+    public void mouseMovedOrUp(int mX, int mY, int mouseButton) {
+        if (mouseButton < 0 || musicLyricsPanel != null || !(currentPanel instanceof tritium.screens.ncm.panels.PlaylistPanel playlistPanel)) return;
+        double xScale = RenderSystem.getWidthNotScaled() / (RenderSystem.getFixedWidth() * .5);
+        double yScale = RenderSystem.getHeightNotScaled() / (RenderSystem.getFixedHeight() * .5);
+        playlistPanel.onMouseReleased(mX / xScale, mY / yScale, mouseButton);
     }
 }

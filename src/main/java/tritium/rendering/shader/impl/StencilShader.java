@@ -43,6 +43,10 @@ public class StencilShader implements SharedConstants {
     }
 
     public void draw(int baseTexture, int stencilTexture, double x, double y, double width, double height) {
+        draw(baseTexture, stencilTexture, x, y, width, height, 1, 1);
+    }
+
+    public void draw(int baseTexture, int stencilTexture, double x, double y, double width, double height, double uMax, double vMax) {
 
         this.stencilProgram.start();
 
@@ -59,7 +63,7 @@ public class StencilShader implements SharedConstants {
         api.getGLStateManager().enableBlend();
         api.getGLStateManager().tryBlendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
         api.getGLStateManager().disableAlpha();
-        ShaderProgram.drawQuadFlipped(x, y, width, height);
+        ShaderProgram.drawQuadFlipped(x, y, width, height, uMax, vMax);
         ShaderProgram.stop();
 
         api.getGLStateManager().setActiveTexture(GL13.GL_TEXTURE16);

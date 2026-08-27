@@ -20,6 +20,10 @@ import tritium.TritiumMusicExtension;
 import tritium.interfaces.SharedConstants;
 import tritium.ncm.OptionsUtil;
 import tritium.ncm.api.CloudMusicApi;
+import tritium.ncm.lyric.provider.LyricProviderPreferences;
+import tritium.ncm.lyric.provider.LyricsFetcher;
+import tritium.ncm.lyric.provider.LyricsQuery;
+import tritium.ncm.lyric.provider.LyricsResult;
 import tritium.ncm.music.dto.Music;
 import tritium.ncm.music.dto.PlayList;
 import tritium.ncm.music.dto.User;
@@ -33,6 +37,7 @@ import tritium.screens.ncm.LyricParser;
 import tritium.screens.ncm.MusicLyricsPanel;
 import tritium.screens.ncm.NCMScreen;
 import tritium.utils.Location;
+import tritium.utils.I18n;
 import tritium.utils.Tuple;
 import tritium.utils.json.JsonUtils;
 import tritium.utils.network.HttpUtils;
@@ -40,6 +45,7 @@ import tritium.utils.other.StringUtils;
 import tritium.utils.other.WrappedInputStream;
 import tritium.utils.other.multithreading.MultiThreadingUtil;
 
+import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.awt.image.ConvolveOp;
@@ -81,12 +87,19 @@ public class CloudMusic implements SharedConstants {
     public static boolean hasTransLyrics = false;
     public static boolean hasRomanization = false;
     public static boolean haveNoWords = false;
+    public static volatile String currentLyricsSource = "";
+    public static volatile long currentLyricsSongId = -1;
 
     public static final File COOKIE_FILE = new File("NCMCookie.txt");
 
     public static void initLyrics(JsonObject rawLyricData, Music music, List<LyricLine> parsedLyrics) {
         resetLyricFlags();
-        detectTranslations(rawLyricData);
+        if (rawLyricData != null) {
+            detectTranslations(rawLyricData);
+        } else {
+            hasTransLyrics = parsedLyrics.stream().anyMatch(line -> line.translationText != null && !line.translationText.isBlank());
+            hasRomanization = parsedLyrics.stream().anyMatch(line -> line.romanizationText != null && !line.romanizationText.isBlank());
+        }
         
         synchronized (lyrics) {
             updateLyricsList(parsedLyrics);
@@ -108,7 +121,7 @@ public class CloudMusic implements SharedConstants {
         lyrics.addAll(parsedLyrics);
         
         if (lyrics.isEmpty()) {
-            lyrics.add(new LyricLine(0L, "暂无歌词"));
+            lyrics.add(new LyricLine(0L, I18n.get("tritium-music.ui.lyrics.unavailable")));
         }
     }
 
@@ -419,6 +432,13 @@ public class CloudMusic implements SharedConstants {
         
         return userPlaylists;
     }
+
+    public static synchronized void refreshLibrary() {
+        if (profile == null) return;
+        List<PlayList> refreshedPlaylists = loadUserPlaylists();
+        if (!refreshedPlaylists.isEmpty()) playLists = refreshedPlaylists;
+        likeList = likeList();
+    }
     
     private static List<PlayList> fetchPlaylistsPage(int page) {
         try {
@@ -534,7 +554,7 @@ public class CloudMusic implements SharedConstants {
     @SneakyThrows
     public static void play(List<Music> songs, int startIdx) {
         // 深拷贝一份以避免打乱的时候影响传进来的列表的顺序
-        List<Music> safeSongList = new ArrayList<>(songs);
+        List<Music> safeSongList = new CopyOnWriteArrayList<>(songs);
         
         stopExistingPlayThread();
         
@@ -544,18 +564,19 @@ public class CloudMusic implements SharedConstants {
         }
         
         startIdx = normalizeStartIndex(startIdx);
-        loadMusicCover(safeSongList.getFirst());
+        loadMusicCover(safeSongList.get(startIdx));
         
         playList = safeSongList;
         startNewPlayThread(safeSongList, startIdx);
     }
     
-    private static void stopExistingPlayThread() throws InterruptedException {
-        if (playThread != null) {
+    private static void stopExistingPlayThread() {
+        Thread currentPlayThread = playThread;
+        playThread = null;
+        if (currentPlayThread != null) {
             doBreak = true;
             playing.set(false);
-            playThread.interrupt();
-            playThread.join();
+            currentPlayThread.interrupt();
         }
     }
     
@@ -575,10 +596,11 @@ public class CloudMusic implements SharedConstants {
     }
     
     private static void startNewPlayThread(List<Music> songs, int startIdx) {
-        playThread = new PlayThread(songs, startIdx);
+        PlayThread newPlayThread = new PlayThread(songs, startIdx);
         doBreak = false;
         playing.set(false);
-        playThread.start();
+        playThread = newPlayThread;
+        newPlayThread.start();
     }
 
     static volatile boolean doBreak = false;
@@ -592,6 +614,7 @@ public class CloudMusic implements SharedConstants {
         public PlayThread(List<Music> songs, int startIdx) {
             this.songs = songs;
             this.setName("Play Thread");
+            this.setDaemon(true);
             this.startIdx = startIdx;
         }
 
@@ -612,14 +635,26 @@ public class CloudMusic implements SharedConstants {
                 }
                 
                 preloadNextCover();
+                preloadNextLyric();
                 waitForPlaybackCompletion();
+                if (!isCurrentPlayback()) {
+                    return;
+                }
                 handlePlaybackCompletion();
+                if (player.isFailed()) {
+                    System.err.println("[NCM] Playback stopped after the audio stream could not recover.");
+                    break;
+                }
                 updateCurrentIndex();
             }
         }
         
         private boolean shouldContinuePlayback() {
-            return curIdx < playList.size() && !doBreak && !this.isInterrupted();
+            return isCurrentPlayback() && curIdx < playList.size() && !doBreak && !this.isInterrupted();
+        }
+
+        private boolean isCurrentPlayback() {
+            return playThread == this;
         }
         
         private boolean playListChanged() {
@@ -636,6 +671,10 @@ public class CloudMusic implements SharedConstants {
             currentlyPlaying = song;
             
             Tuple<String, String> playUrl = song.getPlayUrl();
+
+            if (!isCurrentPlayback()) {
+                return false;
+            }
             
             if (playUrl == null) {
                 handleUnplayableSong(song);
@@ -647,17 +686,16 @@ public class CloudMusic implements SharedConstants {
         
         private boolean initializeAndPlaySong(Music song, Tuple<String, String> playUrl) {
             TritiumMusicExtension.getInstance().musicInfo.downloading = false;
-            File musicFile = getMusicFile(playUrl, song);
-            
+
             try {
-                player = initializePlayer(musicFile);
+                player = initializePlayer(playUrl, song);
             } catch (Exception e) {
                 handlePlayerInitializationError(e);
                 return false;
             }
             
             notifySongStart(song);
-            startPlayback(song, playUrl, musicFile);
+            startPlayback();
             return true;
         }
         
@@ -668,6 +706,7 @@ public class CloudMusic implements SharedConstants {
                 }
                 
                 CloudMusic.updateCurrentLyric(player.getCurrentTimeMillis());
+                player.doDetections();
                 
                 try {
                     Thread.sleep(10L);
@@ -693,9 +732,9 @@ public class CloudMusic implements SharedConstants {
         }
         
         private void handleUnplayableSong(Music song) {
-            api.printMessage(EnumChatColor.RED + "无法播放: " + song.getName() + " - " + song.getArtistsName());
+            api.printMessage(EnumChatColor.RED + I18n.get("tritium-music.ui.playback.unplayable", song.getName(), song.getArtistsName()));
 
-            System.err.printf("%s无法播放: %s - %s, 可能因为该歌曲没有版权\n", EnumChatColor.RED, song.getName(), song.getArtistsName());
+            System.err.println(EnumChatColor.RED + I18n.get("tritium-music.ui.playback.unplayable_copyright", song.getName(), song.getArtistsName()));
         }
         
         private void handlePlayerInitializationError(Exception e) {
@@ -708,20 +747,15 @@ public class CloudMusic implements SharedConstants {
             System.out.printf("[NCM] Now playing: %s, id %d\n", song.getName(), song.getId());
         }
         
-        private void startPlayback(Music song, Tuple<String, String> playUrl, File musicFile) {
-            try {
-                player.play();
-            } catch (ChannelMismatchException e) {
-                player.player.cleanUp();
-                musicFile.delete();
-                player = initializePlayer(getMusicFile(playUrl, song));
-            }
+        private void startPlayback() {
             playing.set(true);
-            
             player.setAfterPlayed(() -> {
-                this.notifyWaitLock();
-                playing.set(false);
+                if (isCurrentPlayback()) {
+                    this.notifyWaitLock();
+                    playing.set(false);
+                }
             });
+            player.play();
         }
         
         private void preloadNextCover() {
@@ -729,63 +763,39 @@ public class CloudMusic implements SharedConstants {
                 loadMusicCover(playList.get(curIdx + 1));
             }
         }
+
+        private void preloadNextLyric() {
+            Music nextSong = nextSong();
+            if (nextSong != null) {
+                LyricsFetcher.getDefault().prefetch(lyricsQuery(nextSong));
+            }
+        }
+
+        private Music nextSong() {
+            if (playList.isEmpty()) return null;
+            if (playMode == PlayMode.LoopSingle) return playList.get(curIdx);
+            int nextIndex = curIdx + 1;
+            if (nextIndex < playList.size()) return playList.get(nextIndex);
+            if (playMode == PlayMode.LoopInList || playMode == PlayMode.Random) return playList.getFirst();
+            return null;
+        }
         
         private void updateCurrentIndex() {
             updateCurIdx();
         }
 
-        private File getMusicFile(Tuple<String, String> playUrl, Music song) {
-
-            String url = playUrl.getA();
+        private AudioPlayer initializePlayer(Tuple<String, String> playUrl, Music song) {
             String type = playUrl.getB().toLowerCase();
-
-            if (type.equals("flac") || type.equals("wav") || type.equals("mp3")) {
-                return getCachedOrTempFile(url, type, song);
+            if (!type.equals("flac") && !type.equals("wav") && !type.equals("mp3")) {
+                throw new IllegalArgumentException("Unsupported music format, url: " + playUrl.getA() + ", type: " + type);
             }
-            throw new IllegalArgumentException("Unsupported music format, url: " + url + ", type: " + type);
-        }
-
-        private File getCachedOrTempFile(String playUrl, String type, Music song) {
-            File musicCacheDir = new File("MusicCache");
-
-            if (!musicCacheDir.exists()) {
-                musicCacheDir.mkdir();
-            }
-
-            String extension = "_" + quality.getQuality() + "." + type;
-
-            File music = new File(musicCacheDir, song.getId() + extension);
-
-            if (!music.exists()) {
-                downloadMusic(playUrl, music);
-
-                // delete all other qualities
-
-                MultiThreadingUtil.runAsync(() -> {
-
-                    for (File file : musicCacheDir.listFiles()) {
-
-                        if (file.getName().startsWith(String.valueOf(song.getId())) && !file.getName().startsWith(song.getId() + "_" + quality.getQuality())) {
-                            file.delete();
-                        }
-
-                    }
-
-                });
-            }
-
-            return music;
-        }
-
-        private AudioPlayer initializePlayer(File musicFile) {
             AudioPlayer player = CloudMusic.player;
             if (player == null) {
-                player = new AudioPlayer(musicFile);
-//                player.volume = 0.25f;
+                player = new AudioPlayer(playUrl.getA(), type, song.getDuration());
                 player.setVolume(TritiumMusicExtension.getInstance().musicInfo.volume.getValue().floatValue());
                 CloudMusic.player = player;
             } else {
-                player.setAudio(musicFile);
+                player.setAudio(playUrl.getA(), type, song.getDuration());
             }
             return player;
         }
@@ -1074,41 +1084,73 @@ public class CloudMusic implements SharedConstants {
 
     public static void loadLyric(Music music) {
         MultiThreadingUtil.runAsync(() -> {
-
-            String string = CloudMusicApi.lyricNew(music.getId()).toString();
-
-            string = string.replaceAll("[ - ]", " ");
-
-            JsonObject json = JsonUtils.toJsonObject(string);
-
-            List<LyricLine> parsed = LyricParser.parse(json);
-
-            InputStream stream = CloudMusic.class.getResourceAsStream("/tritium/yrc/" + music.getId() + ".yrc");
-            if (stream != null) {
-                try {
-                    String s = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
-                    List<LyricLine> newLines = new ArrayList<>();
-                    LyricParser.parseYrc(s, newLines);
-
-                    for (int i = 0; i < newLines.size(); i++) {
-                        LyricLine newLine = newLines.get(i);
-                        LyricLine oldLine = parsed.get(i);
-                        oldLine.words.clear();
-                        oldLine.words.addAll(newLine.words);
-                        oldLine.timestamp = newLine.timestamp;
-                        oldLine.lyric = newLine.lyric;
-                        oldLine.duration = newLine.duration;
-                    }
-
-                    stream.close();
-                } catch (IOException ignored) {
-                }
-            }
-
-            // 使用集中式歌词管理
-            initLyrics(json, music, parsed);
-
+            LyricsQuery query = lyricsQuery(music);
+            String selectedProvider = LyricProviderPreferences.get().provider(music.getId());
+            Optional<LyricsResult> fetched = LyricsFetcher.getDefault().fetch(query, selectedProvider);
+            if (!selectedProvider.equals(LyricProviderPreferences.get().provider(music.getId()))) return;
+            LyricsResult result = fetched.orElse(new LyricsResult("", "plain", "none"));
+            applyLyrics(music, result);
         });
+    }
+
+    public static List<LyricsFetcher.AvailableLyrics> availableLyrics(Music music) {
+        return LyricsFetcher.getDefault().available(lyricsQuery(music));
+    }
+
+    public static void selectLyricsProvider(Music music, String providerId) {
+        LyricProviderPreferences.get().select(music.getId(), providerId);
+        loadLyric(music);
+    }
+
+    public static String selectedLyricsProvider(Music music) {
+        return LyricProviderPreferences.get().provider(music.getId());
+    }
+
+    private static void applyLyrics(Music music, LyricsResult result) {
+        List<LyricLine> parsed = LyricParser.parse(result);
+        JsonObject json = "netease".equals(result.format()) ? JsonUtils.toJsonObject(result.lyrics()) : null;
+
+        InputStream stream = CloudMusic.class.getResourceAsStream("/tritium/yrc/" + music.getId() + ".yrc");
+        if (stream != null && json != null) {
+            try {
+                String s = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+                List<LyricLine> newLines = new ArrayList<>();
+                LyricParser.parseYrc(s, newLines);
+                for (int i = 0; i < Math.min(newLines.size(), parsed.size()); i++) {
+                    LyricLine newLine = newLines.get(i);
+                    LyricLine oldLine = parsed.get(i);
+                    oldLine.words.clear();
+                    oldLine.words.addAll(newLine.words);
+                    oldLine.timestamp = newLine.timestamp;
+                    oldLine.lyric = newLine.lyric;
+                    oldLine.duration = newLine.duration;
+                }
+                stream.close();
+            } catch (IOException ignored) {
+            }
+        }
+
+        if (music.equals(currentlyPlaying)) {
+            currentLyricsSource = result.source();
+            currentLyricsSongId = music.getId();
+            initLyrics(json, music, parsed);
+        }
+    }
+
+    public static synchronized void playNext(Music music) {
+        if (music == null) return;
+        if (currentlyPlaying == null || player == null || playList.isEmpty()) {
+            play(List.of(music), 0);
+            return;
+        }
+        int nextIndex = Math.min(curIdx + 1, playList.size());
+        playList.add(nextIndex, music);
+        loadMusicCover(music);
+    }
+
+    private static LyricsQuery lyricsQuery(Music music) {
+        String album = music.getAlbum() == null || music.getAlbum().getName() == null ? "" : music.getAlbum().getName();
+        return new LyricsQuery(music.getId(), music.getArtistsName(), music.getName(), album);
     }
 
     public static String qrCodeLogin() {
@@ -1156,18 +1198,7 @@ public class CloudMusic implements SharedConstants {
             }
 
             if (code == 803) {
-
-                String cookie = json.get("cookie").getAsString();
-
-                String[] split = cookie.split(";");
-                StringBuilder sb = new StringBuilder();
-                for (String s : split) {
-                    if (s.contains("MUSIC_U") || s.contains("__csrf")) {
-                        sb.append(s).append("; ");
-                    }
-                }
-
-                return sb.substring(0, sb.length() - 2);
+                return OptionsUtil.getCookie();
             }
 
             try {
@@ -1181,14 +1212,12 @@ public class CloudMusic implements SharedConstants {
     public static User getUserProfile() {
         JsonObject jsonObject = CloudMusicApi.loginStatus().toJsonObject();
 
-        JsonObject d = jsonObject.getAsJsonObject("data");
-
-        if ((!d.has("account") || d.get("account") instanceof JsonNull) || (!d.has("profile") || d.get("profile") instanceof JsonNull)) {
-            OptionsUtil.setCookie("");
+        if ((!jsonObject.has("account") || jsonObject.get("account") instanceof JsonNull) || (!jsonObject.has("profile") || jsonObject.get("profile") instanceof JsonNull)) {
+            OptionsUtil.clearAuthentication();
             return null;
         }
 
-        JsonObject profile = d.getAsJsonObject("profile");
+        JsonObject profile = jsonObject.getAsJsonObject("profile");
 
         return JsonUtils.parse(profile, User.class);
     }

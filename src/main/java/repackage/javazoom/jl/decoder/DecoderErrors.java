@@ -29,7 +29,7 @@ package repackage.javazoom.jl.decoder;
  */
 public interface DecoderErrors extends JavaLayerErrors {
 
-    int UNKNOWN_ERROR = DECODER_ERROR + 0;
+    int UNKNOWN_ERROR = DECODER_ERROR;
 
     /**
      * Layer not supported by the decoder.

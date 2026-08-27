@@ -9,6 +9,7 @@ import tritium.rendering.TextureManager;
 import tritium.rendering.animation.Interpolations;
 import tritium.rendering.texture.Textures;
 import tritium.rendering.ui.widgets.LabelWidget;
+import tritium.rendering.ui.widgets.RectWidget;
 import tritium.rendering.ui.widgets.RoundedImageWidget;
 import tritium.rendering.ui.widgets.RoundedRectWidget;
 import tritium.screens.ncm.NCMScreen;
@@ -22,14 +23,62 @@ import java.awt.*;
  */
 public class MusicWidget extends RoundedRectWidget {
 
+    public enum Style {
+        LIST,
+        GRID
+    }
+
     public PlayList playList;
     public Music music;
     boolean coverLoaded = false;
+    private final Style style;
+    private double emphasizeAnim;
+    private double playingAnimation;
+    private double pressAnimation;
+    private boolean leftPressed;
+    private RoundedImageWidget gridCover;
 
-    public MusicWidget(Music music, PlayList playList, int index) {
+    private final int index;
+    private final long revealStart;
+    private boolean entranceDone = false;
+
+    private static final long ENTRANCE_BASE_DELAY_MS = 160;
+    private static final long ENTRANCE_STAGGER_MS = 42;
+    private static final long ENTRANCE_DURATION_MS = 520;
+    private static final int ENTRANCE_INDEX_CAP = 16;
+    private static final double ENTRANCE_SLIDE = 12;
+    private static final double GRID_COVER_SIZE = 102;
+    private static final double GRID_EMPHASIZE_MAX = 5;
+    private static final double GRID_WIDTH = GRID_COVER_SIZE + GRID_EMPHASIZE_MAX + 6;
+
+    public MusicWidget(Music music, PlayList playList, int index, long revealStart) {
+        this(music, playList, index, revealStart, null, Style.LIST);
+    }
+
+    public MusicWidget(Music music, PlayList playList, int index, long revealStart, Style style) {
+        this(music, playList, index, revealStart, null, style);
+    }
+
+    public MusicWidget(Music music, PlayList playList, int index, long revealStart, PlaylistPanel owner, Style style) {
         super(0, 0, 0, 30);
         this.music = music;
         this.playList = playList;
+        this.index = index;
+        this.revealStart = revealStart;
+        this.style = style;
+
+        this.setTransformations(() -> {
+            float ep = this.entranceProgress();
+            api.getGLStateManager().translate(0, (1f - ep) * ENTRANCE_SLIDE, 0);
+            if (style == Style.GRID && pressAnimation > .001) {
+                this.scaleAtPos(this.getX() + this.getWidth() * .5, this.getY() + this.getHeight() * .5, 1 - pressAnimation * .04);
+            }
+        });
+
+        if (style == Style.GRID) {
+            this.initGrid(owner);
+            return;
+        }
 
         RoundedRectWidget rrHoverIndicator = new RoundedRectWidget();
         this.addChild(rrHoverIndicator);
@@ -55,6 +104,17 @@ public class MusicWidget extends RoundedRectWidget {
                 .setRadius(this.getRadius()));
 
         this.setBeforeRenderCallback(() -> {
+
+            if (!entranceDone) {
+                float ep = this.entranceProgress();
+                if (ep >= 1f) {
+                    entranceDone = true;
+                    this.setAlpha(1f);
+                    this.setTransformations(null);
+                } else {
+                    this.setAlpha(ep);
+                }
+            }
 
             // 只在这个 music 被渲染的时候才加载封面
             if (!coverLoaded) {
@@ -91,6 +151,8 @@ public class MusicWidget extends RoundedRectWidget {
 
             if (i == 0)
                 CloudMusic.play(playList.getMusics(), index);
+            else if (i == 1 && owner != null)
+                owner.openMusicMenu(this, this.getX() + x, this.getY() + y);
 
             return true;
         });
@@ -191,6 +253,128 @@ public class MusicWidget extends RoundedRectWidget {
         lblMusicDuration.setClickable(false);
     }
 
+    @Override
+    public void onRender(double mouseX, double mouseY) {
+        if (style == Style.LIST) {
+            super.onRender(mouseX, mouseY);
+            return;
+        }
+
+        pressAnimation = Interpolations.interpolate(pressAnimation, leftPressed ? 1 : 0, leftPressed ? .45f : .28f);
+        playingAnimation = Interpolations.interpolate(playingAnimation, isPlaying() ? 1 : 0, .3f);
+        if (gridCover != null && playingAnimation > .01) {
+            int alpha = (int) (255 * this.getAlpha() * playingAnimation);
+            this.roundedOutline(gridCover.getX(), gridCover.getY(), gridCover.getWidth() + .2, gridCover.getHeight() + .3,
+                    gridCover.getRadius() + 4, 1.5, 2, new Color(214, 0, 23, alpha));
+        }
+    }
+
+    private void initGrid(PlaylistPanel owner) {
+        String translatedNames = music.getTranslatedNames();
+        double gridHeight = translatedNames.isEmpty() ? 121 : 133;
+        this.setBounds(GRID_WIDTH, gridHeight);
+
+        this.setBeforeRenderCallback(() -> {
+            if (!entranceDone) {
+                float ep = this.entranceProgress();
+                if (ep >= 1f) {
+                    entranceDone = true;
+                    this.setAlpha(1f);
+                } else {
+                    this.setAlpha(ep);
+                }
+            }
+            if (!coverLoaded) {
+                coverLoaded = true;
+                this.loadCover();
+            }
+            this.setBounds(GRID_WIDTH, gridHeight);
+        });
+
+        this.setOnClickCallback((x, y, mouseButton) -> {
+            if (mouseButton == 0) leftPressed = true;
+            else if (mouseButton == 1 && owner != null) owner.openMusicMenu(this, this.getX() + x, this.getY() + y);
+            return true;
+        });
+
+        gridCover = new RoundedImageWidget(this.music.getGridCoverLocation(), 0, 0, GRID_COVER_SIZE, GRID_COVER_SIZE);
+        this.addChild(gridCover);
+        gridCover.setClickable(false).fadeIn().setLinearFilter(true).setBeforeRenderCallback(() -> {
+            emphasizeAnim = Interpolations.interpolate(emphasizeAnim, gridCover.isHovering() ? GRID_EMPHASIZE_MAX : 0, .2f);
+            gridCover.setBounds(GRID_COVER_SIZE + emphasizeAnim);
+            gridCover.setRadius(4);
+            gridCover.centerHorizontally();
+            gridCover.setPosition(gridCover.getRelativeX(), GRID_WIDTH * .5 - GRID_COVER_SIZE * .5 - emphasizeAnim * .5);
+        });
+
+        RoundedRectWidget playingIndicator = new RoundedRectWidget(0, 0, 21, 15);
+        this.addChild(playingIndicator);
+        playingIndicator.setClickable(false).setColor(0xFF18181A).setRadius(3).setAlpha(0f).setBeforeRenderCallback(() -> {
+            playingIndicator.setAlpha(Interpolations.interpolate(playingIndicator.getWidgetAlpha(), isPlaying() ? .75f : 0f, .35f));
+            playingIndicator.setPosition(gridCover.getRelativeX() + gridCover.getWidth() - playingIndicator.getWidth() - 5,
+                    gridCover.getRelativeY() + 5);
+        });
+
+        for (int i = 0; i < 3; i++) {
+            int barIndex = i;
+            RectWidget bar = new RectWidget();
+            playingIndicator.addChild(bar);
+            bar.setClickable(false).setColor(0xFFD60017).setBeforeRenderCallback(() -> {
+                boolean active = CloudMusic.player != null && !CloudMusic.player.isPausing();
+                double phase = System.currentTimeMillis() * .012 + barIndex * 1.7;
+                double activity = active ? (Math.sin(phase) + 1) * .5 : 0;
+                double barHeight = 3 + activity * 6;
+                bar.setBounds(2, barHeight);
+                bar.setPosition(5 + barIndex * 4.5, playingIndicator.getHeight() - 3 - barHeight);
+            });
+        }
+
+        LabelWidget lblMusicName = new LabelWidget(music.getName(), FontManager.pf14bold);
+        this.addChild(lblMusicName);
+        lblMusicName.setClickable(false).setWidthLimitType(LabelWidget.WidthLimitType.TRIM_TO_WIDTH).setMaxWidth(GRID_COVER_SIZE)
+                .setBeforeRenderCallback(() -> {
+                    lblMusicName.setColor(isPlaying() ? 0xFFD60017 : NCMScreen.getColor(NCMScreen.ColorType.PRIMARY_TEXT));
+                    lblMusicName.setPosition(gridCover.getRelativeX(), gridCover.getRelativeY() + gridCover.getHeight() + 4);
+                });
+
+        if (!translatedNames.isEmpty()) {
+            LabelWidget lblTranslatedName = new LabelWidget(translatedNames, FontManager.pf12);
+            this.addChild(lblTranslatedName);
+            lblTranslatedName.setClickable(false).setWidthLimitType(LabelWidget.WidthLimitType.TRIM_TO_WIDTH).setMaxWidth(GRID_COVER_SIZE)
+                    .setBeforeRenderCallback(() -> {
+                        lblTranslatedName.setColor(NCMScreen.getColor(NCMScreen.ColorType.SECONDARY_TEXT));
+                        lblTranslatedName.setPosition(gridCover.getRelativeX(), gridCover.getRelativeY() + gridCover.getHeight() + 6 + FontManager.pf14bold.getHeight());
+                    });
+        }
+    }
+
+    private boolean isPlaying() {
+        return CloudMusic.currentlyPlaying != null && CloudMusic.currentlyPlaying.getId() == music.getId();
+    }
+
+    public void onMouseReleased(double mouseX, double mouseY, int mouseButton, boolean insidePanel) {
+        if (style != Style.GRID || mouseButton != 0) return;
+        boolean shouldPlay = leftPressed && insidePanel && testHovered(mouseX, mouseY);
+        leftPressed = false;
+        if (shouldPlay) CloudMusic.play(playList.getMusics(), index);
+    }
+
+    private float entranceProgress() {
+        long delay = ENTRANCE_BASE_DELAY_MS + (long) (Math.min(index, ENTRANCE_INDEX_CAP) * ENTRANCE_STAGGER_MS);
+        long elapsed = System.currentTimeMillis() - revealStart - delay;
+
+        if (elapsed <= 0L) {
+            return 0f;
+        }
+        if (elapsed >= ENTRANCE_DURATION_MS) {
+            return 1f;
+        }
+
+        float t = elapsed / (float) ENTRANCE_DURATION_MS;
+        float inv = 1f - t;
+        return 1f - inv * inv * inv;
+    }
+
     private String formatDuration(long totalMillis) {
         long totalSeconds = totalMillis / 1000;
 
@@ -213,11 +397,11 @@ public class MusicWidget extends RoundedRectWidget {
     private void loadCover() {
 
         TextureManager textureManager = TextureManager.getInstance();
-        Location coverLoc = this.music.getSmallCoverLocation();
+        Location coverLoc = style == Style.GRID ? this.music.getGridCoverLocation() : this.music.getSmallCoverLocation();
         if (textureManager.getTexture(coverLoc) != null)
             return;
 
-        Textures.downloadTextureAndLoadAsync(music.getCoverUrl(64), coverLoc);
+        Textures.downloadTextureAndLoadAsync(music.getCoverUrl(style == Style.GRID ? 256 : 64), coverLoc);
     }
 
 }

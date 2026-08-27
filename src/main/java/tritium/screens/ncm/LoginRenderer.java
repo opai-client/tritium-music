@@ -14,6 +14,7 @@ import tritium.rendering.Rect;
 import tritium.rendering.rendersystem.RenderSystem;
 import tritium.rendering.texture.ITextureObject;
 import tritium.utils.Location;
+import tritium.utils.I18n;
 
 import static tritium.screens.ncm.NCMScreen.ColorType.PRIMARY_TEXT;
 
@@ -71,7 +72,7 @@ public class LoginRenderer implements SharedRenderingConstants, SharedConstants 
 
         double qWidth = 96, qHeight = 96;
 
-        String[] strings = FontManager.pf20.fitWidth("扫码", width - 24);
+        String[] strings = FontManager.pf20.fitWidth(I18n.get("tritium-music.ui.login.title"), width - 24);
 
         double startY = posY + height / 6.0;
 

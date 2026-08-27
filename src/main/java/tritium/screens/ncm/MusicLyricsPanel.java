@@ -10,6 +10,7 @@ import tritium.management.FontManager;
 import tritium.ncm.music.AudioPlayer;
 import tritium.ncm.music.CloudMusic;
 import tritium.ncm.music.dto.Music;
+import tritium.ncm.lyric.provider.LyricsFetcher;
 import tritium.rendering.*;
 import tritium.rendering.Image;
 import tritium.rendering.animation.Easing;
@@ -18,10 +19,13 @@ import tritium.rendering.entities.impl.ScrollText;
 import tritium.rendering.rendersystem.RenderSystem;
 import tritium.rendering.shader.ShaderProgram;
 import tritium.rendering.shader.Shaders;
+import tritium.rendering.shader.impl.BloomShader;
 import tritium.rendering.texture.ITextureObject;
 import tritium.rendering.ui.widgets.IconWidget;
+import tritium.rendering.ui.widgets.ContextMenuWidget;
 import tritium.settings.ClientSettings;
 import tritium.utils.Location;
+import tritium.utils.I18n;
 import tritium.utils.cursor.CursorUtils;
 import tritium.utils.math.Mth;
 import tritium.utils.network.HttpUtils;
@@ -44,6 +48,10 @@ public class MusicLyricsPanel implements SharedRenderingConstants, SharedConstan
     static double scrollOffset, scrollTarget;
 
     double fftScale = 0;
+    double bassBaseline = 0;
+    double bassDeviation = 0.02;
+    float[] previousBassSpectrum = new float[0];
+    long lastBassUpdateNanos = System.nanoTime();
     float musicBgAlpha = 1.0f;
     static ITextureObject prevBg = null, prevCover;
     static Music prevMusic = null;
@@ -53,14 +61,21 @@ public class MusicLyricsPanel implements SharedRenderingConstants, SharedConstan
 
     Framebuffer baseFb, stencilFb;
 
+    static BloomShader coverBloomShader;
+
     Timer scrollOffsetResetTimer = new Timer();
 
     double coverSize = (CloudMusic.player == null || CloudMusic.player.isPausing()) ? this.getCoverSizeMin() : this.getCoverSizeMax();
     float coverAlpha = 1f;
 
+    double coverFloatX = 0.5, coverFloatY = 0.5;
+    double coverFloatTargetX = 0.5, coverFloatTargetY = 0.5;
+    Timer coverFloatTimer = new Timer();
+
     boolean progressBarDragging = false;
     double progressBarProgressOverride = 0;
     double progressBarHeight = 8, volumeBarHeight = 8;
+    double progressThumbAlpha = 0, volumeThumbAlpha = 0;
 
     boolean prevMouse = false;
 
@@ -68,6 +83,8 @@ public class MusicLyricsPanel implements SharedRenderingConstants, SharedConstan
     IconWidget playPauseButton = new IconWidget("G", FontManager.music40, 0, 0, 24, 24);
     IconWidget prev = new IconWidget("E", FontManager.music40, 0, 0, 32, 32);
     IconWidget next = new IconWidget("H", FontManager.music40, 0, 0, 32, 32);
+    private final ContextMenuWidget contextMenu = new ContextMenuWidget();
+    private long providerMenuRequest;
 
     private final Music music;
     public MusicLyricsPanel(Music music) {
@@ -279,6 +296,8 @@ public class MusicLyricsPanel implements SharedRenderingConstants, SharedConstan
         this.renderControlsPart(mouseX, mouseY, posX, posY, width, height, alpha);
         this.renderLyrics(mouseX, mouseY, posX, posY, width, height, dWheel, alpha);
         api.getGLStateManager().popMatrix();
+        contextMenu.setAlpha(alpha);
+        contextMenu.renderWidget(mouseX, mouseY, contextMenu.handleWheel(mouseX, mouseY, dWheel) ? 0 : dWheel);
     }
 
     private void renderLyrics(double mouseX, double mouseY, double posX, double posY, double width, double height, int dWheel, float alpha) {
@@ -318,6 +337,16 @@ public class MusicLyricsPanel implements SharedRenderingConstants, SharedConstan
         scrollOffset = Interpolations.interpolate(scrollOffset, scrollTarget, 0.25f);
 
         double lyricRenderOffsetX = RenderSystem.getWidth() * .48;
+
+        double dividerX = lyricRenderOffsetX - 32;
+        double dividerMidY = posY + height * 0.5;
+        RenderSystem.drawGradientRectTopToBottom(dividerX, posY + height * 0.16, dividerX + 1, dividerMidY, hexColor(1f, 1f, 1f, 0f), hexColor(1f, 1f, 1f, alpha * 0.06f));
+        RenderSystem.drawGradientRectTopToBottom(dividerX, dividerMidY, dividerX + 1, posY + height * 0.84, hexColor(1f, 1f, 1f, alpha * 0.06f), hexColor(1f, 1f, 1f, 0f));
+
+        LyricLine currentLyric = progressBarDragging ? CloudMusic.findCurrentLyric(overridePlaybackProgress) : CloudMusic.currentLyric;
+        int currentIndex = CloudMusic.lyrics.indexOf(currentLyric);
+
+
         for (int k = 0; k < CloudMusic.lyrics.size(); k++) {
             LyricLine lyric = CloudMusic.lyrics.get(k);
 
@@ -329,14 +358,11 @@ public class MusicLyricsPanel implements SharedRenderingConstants, SharedConstan
                 break;
             }
 
-            LyricLine currentLyric = progressBarDragging ? CloudMusic.findCurrentLyric(overridePlaybackProgress) : CloudMusic.currentLyric;
-            int indexOf = CloudMusic.lyrics.indexOf(currentLyric);
-
             boolean isCurrentLyric = lyric == currentLyric;
             lyric.alpha = Interpolations.interpolate(lyric.alpha, isCurrentLyric ? 1f : 0f, isCurrentLyric ? 0.1f : .05f);
             boolean isHovering = isHovered(mouseX, mouseY - scrollOffset, lyricRenderOffsetX, lyric.posY, lyricsWidth, lyric.height);
             lyric.hoveringAlpha = Interpolations.interpolate(lyric.hoveringAlpha, isHovering ? 1f : 0f, 0.2f);
-            lyric.blurAlpha = Interpolations.interpolate(lyric.blurAlpha, !hoveringLyrics ? Math.min(1f, Math.abs(k - indexOf) * .85f) : 0f, 0.05f);
+            lyric.blurAlpha = Interpolations.interpolate(lyric.blurAlpha, !hoveringLyrics ? Math.min(1f, Math.abs(k - currentIndex) * .85f) : 0f, 0.05f);
 
             if (isHovering) {
                 CursorUtils.setOverride(CursorUtils.HAND);
@@ -395,12 +421,12 @@ public class MusicLyricsPanel implements SharedRenderingConstants, SharedConstan
                             FontManager.pf65bold.drawString(word.word, renderX, renderY - word.emphasizes[0], hexColor(1, 1, 1, alpha * .5f));
                         }
                     } else {
-                        FontManager.pf65bold.drawString(word.word, renderX, renderY, hexColor(1, 1, 1, alpha * .5f));
+                        FontManager.pf65bold.drawString(word.word, renderX, renderY, hexColor(1, 1, 1, alpha * .35f));
                     }
 
-                    if (CloudMusic.lyrics.indexOf(currentLyric) - k <= 1) {
+                    if (currentIndex - k <= 1) {
                         double progress = Mth.limit((songProgress - word.timestamp)/* * (isCurrentLyric ? 1 : 1.5)*/ / (double) (word.duration), 0, 1);
-                        double stringWidthD = FontManager.pf65bold.getStringWidthD(word.word);
+                        double stringWidthD = wordWidth;
 
                         boolean shouldClip = progress > 0 && progress < 1;
 
@@ -423,6 +449,11 @@ public class MusicLyricsPanel implements SharedRenderingConstants, SharedConstan
                             int scale = 2;
                             int fbWidth = ((int) stringWidthD) * scale, fbHeight = (FontManager.pf65bold.getHeight() + 6) * scale;
 
+                            int allocW = fbWidth;
+                            if (baseFb != null) allocW = Math.max(allocW, baseFb.framebufferWidth);
+                            if (stencilFb != null) allocW = Math.max(allocW, stencilFb.framebufferWidth);
+                            double uMax = fbWidth / (double) allocW;
+
 //                            if (StencilClipManager.stencilClipping())
 //                                GL11.glDisable(GL11.GL_STENCIL_TEST);
 
@@ -439,10 +470,11 @@ public class MusicLyricsPanel implements SharedRenderingConstants, SharedConstan
 
                             // stencil texture
                             {
-                                stencilFb = RenderSystem.createFrameBuffer(stencilFb, fbWidth, fbHeight);
+                                stencilFb = RenderSystem.createFrameBuffer(stencilFb, allocW, fbHeight);
                                 stencilFb.bindFramebuffer(true);
                                 stencilFb.setFramebufferColor(1, 1, 1, 0);
                                 stencilFb.framebufferClearNoBinding();
+                                GL11.glViewport(0, 0, fbWidth, fbHeight);
 
                                 StencilClipManager.disableStencilTest();
 
@@ -453,10 +485,11 @@ public class MusicLyricsPanel implements SharedRenderingConstants, SharedConstan
 
                             // base texture
                             {
-                                baseFb = RenderSystem.createFrameBuffer(baseFb, fbWidth, fbHeight);
+                                baseFb = RenderSystem.createFrameBuffer(baseFb, allocW, fbHeight);
                                 baseFb.bindFramebuffer(true);
                                 baseFb.setFramebufferColor(1, 1, 1, 0);
                                 baseFb.framebufferClearNoBinding();
+                                GL11.glViewport(0, 0, fbWidth, fbHeight);
 
                                 StencilClipManager.disableStencilTest();
 
@@ -486,7 +519,7 @@ public class MusicLyricsPanel implements SharedRenderingConstants, SharedConstan
 //                            if (StencilClipManager.stencilClipping())
 //                                GL11.glEnable(GL11.GL_STENCIL_TEST);
 
-                            Shaders.STENCIL.draw(baseFb.framebufferTexture, stencilFb.framebufferTexture, renderX, renderY - 2, fbWidth * .5, fbHeight * .5);
+                            Shaders.STENCIL.draw(baseFb.framebufferTexture, stencilFb.framebufferTexture, renderX, renderY - 2, fbWidth * .5, fbHeight * .5, uMax, 1.0);
 
                             if (ClientSettings.SHOW_WIDGET_BOUNDARY) {
 //                                FontManager.pf18bold.drawString("Stencil: " + stencilFb.framebufferTextureWidth + "x" + stencilFb.framebufferTextureHeight, 50, 32, -1);
@@ -500,7 +533,7 @@ public class MusicLyricsPanel implements SharedRenderingConstants, SharedConstan
 
                                 api.getGLStateManager().bindTexture(baseFb.framebufferTexture);
                                 double xOff = spacing + 120;
-                                ShaderProgram.drawQuadFlipped(xOff, spacing, fbWidth * .5, fbHeight * .5);
+                                ShaderProgram.drawQuadFlipped(xOff, spacing, allocW * .5, fbHeight * .5);
 
                                 FontManager.pf28bold.drawCenteredStringVertical("Base Texture", spacing + 8, spacing + fbHeight * .25, -1);
 
@@ -509,7 +542,7 @@ public class MusicLyricsPanel implements SharedRenderingConstants, SharedConstan
 
                                 FontManager.pf28bold.drawCenteredStringVertical("Stencil Texture", spacing + 8, spacing + fbHeight * .5 + 20 + fbHeight * .25, -1);
 
-                                Shaders.STENCIL.draw(baseFb.framebufferTexture, stencilFb.framebufferTexture, xOff, spacing + (fbHeight * .5) * 2 + 40, fbWidth * .5, fbHeight * .5);
+                                Shaders.STENCIL.draw(baseFb.framebufferTexture, stencilFb.framebufferTexture, xOff, spacing + (fbHeight * .5) * 2 + 40, allocW * .5, fbHeight * .5);
 
                                 FontManager.pf28bold.drawCenteredStringVertical("Result", spacing + 8, spacing + (fbHeight * .5) * 2 + 40 + fbHeight * .25, -1);
 
@@ -532,7 +565,7 @@ public class MusicLyricsPanel implements SharedRenderingConstants, SharedConstan
                 String[] strings = FontManager.pf65bold.fitWidth(lyric.lyric, lyricsWidth);
 
                 for (String string : strings) {
-                    FontManager.pf65bold.drawString(string, renderX, renderY, hexColor(1, 1, 1, alpha * ((lyric.alpha * .6f) + .4f)));
+                    FontManager.pf65bold.drawString(string, renderX, renderY, hexColor(1, 1, 1, alpha * ((lyric.alpha * .7f) + .3f)));
                     renderY += FontManager.pf65bold.getHeight() * .85 + 4;
                 }
 
@@ -551,13 +584,13 @@ public class MusicLyricsPanel implements SharedRenderingConstants, SharedConstan
 //                FontManager.pf34bold.drawString(lyric.translationText, translationX, translationY, hexColor(1, 1, 1, alpha * .75f * ((lyric.alpha * .6f) + .4f)));
             }
 
-            blurRects.add(() -> Rect.draw(lyricRenderOffsetX - 4, lyric.posY + scrollOffset, lyricsWidth, lyric.height + 8, hexColor(1, 1, 1, alpha * lyric.blurAlpha)));
+            if (alpha * lyric.blurAlpha > 0.004f)
+                blurRects.add(() -> Rect.draw(lyricRenderOffsetX - 4, lyric.posY + scrollOffset, lyricsWidth, lyric.height + 8, hexColor(1, 1, 1, alpha * lyric.blurAlpha)));
         }
 
         api.getGLStateManager().pushMatrix();
         this.scaleAtPos(lyricRenderOffsetX, RenderSystem.getHeight() * .5, 1 / (1.1 - (alpha * 0.1)));
-        Shaders.BLUR_SHADER.run(blurRects);
-//        Shaders.UI_BLOOM_SHADER.runNoCaching(bloomRunnables);
+        Shaders.BLUR_SHADER.runNoCaching(blurRects);
         api.getGLStateManager().popMatrix();
     }
 
@@ -592,8 +625,9 @@ public class MusicLyricsPanel implements SharedRenderingConstants, SharedConstan
             offsetY = RenderSystem.getHeight() * lyricFraction();
             List<LyricLine> list = CloudMusic.lyrics.subList(idxCurrent, CloudMusic.lyrics.size());
             int oobCounter = 0;
+            int j = idxCurrent - 1;
             for (LyricLine lyric : list) {
-                int j = CloudMusic.lyrics.indexOf(lyric);
+                j++;
 
 //                Rect.draw(RenderSystem.getWidth() * .5 + lyric.reboundAnimation, lyric.posY, width, lyric.height, 0x80FFFFFF);
 
@@ -658,8 +692,11 @@ public class MusicLyricsPanel implements SharedRenderingConstants, SharedConstan
 
         api.getGLStateManager().pushMatrix();
         this.scaleAtPos(RenderSystem.getWidth() * .5, RenderSystem.getHeight() * .5, (.925 + (alpha * 0.075)));
-        Shaders.BLOOM_SHADER.run(Collections.singletonList(() -> {
-            this.roundedRect(center - coverSize * .5 + xOffset, center - coverSize * .575, coverSize, coverSize, coverRadius * coverSizePerc, -.5, 0, 0, 0, alpha * .4f);
+        if (coverBloomShader == null) {
+            coverBloomShader = new BloomShader();
+        }
+        coverBloomShader.run(Collections.singletonList(() -> {
+            this.roundedRect(center - coverSize * .5 + xOffset, center - coverSize * .575, coverSize, coverSize, coverRadius * coverSizePerc - 2, -.5, 0, 0, 0, alpha * .4f);
         }));
         api.getGLStateManager().popMatrix();
 
@@ -690,7 +727,7 @@ public class MusicLyricsPanel implements SharedRenderingConstants, SharedConstan
         double progressBarYOffset = elementsYOffset + FontManager.pf20bold.getHeight() + 8 + FontManager.pf20bold.getHeight() + 8;
         double progressBarWidth = this.getCoverSizeMax();
 
-        roundedRect(elementsXOffset, progressBarYOffset - progressBarHeight * .5, progressBarWidth, progressBarHeight, (this.progressBarHeight / 8.0f) * 2.5, hexColor(1, 1, 1, alpha * .5f));
+        roundedRect(elementsXOffset, progressBarYOffset - progressBarHeight * .5, progressBarWidth, progressBarHeight, (this.progressBarHeight / 8.0f) * 2.5, hexColor(1, 1, 1, alpha * .22f));
 
         float currentTimeMillis = player == null ? 0 : player.getCurrentTimeMillis();
         float totalTimeMillis = player == null ? 0.01f : player.getTotalTimeMillis();
@@ -703,6 +740,8 @@ public class MusicLyricsPanel implements SharedRenderingConstants, SharedConstan
 
         boolean hoveringProgressBar = progressBarDragging || this.isHovered(mouseX, mouseY, elementsXOffset, progressBarYOffset - progressBarHeight * .5, progressBarWidth, 8);
         this.progressBarHeight = Interpolations.interpolate(this.progressBarHeight, hoveringProgressBar ? 8 : 5, 0.3f);
+
+        this.progressThumbAlpha = Interpolations.interpolate(this.progressThumbAlpha, hoveringProgressBar ? 1.0 : 0.0, 0.25f);
 
         boolean lmbDown = Mouse.isButtonDown(0);
         if (hoveringProgressBar && lmbDown && !prevMouse) {
@@ -750,13 +789,16 @@ public class MusicLyricsPanel implements SharedRenderingConstants, SharedConstan
         FontManager.music40.drawString("J", elementsXOffset + progressBarWidth - FontManager.music40.getStringWidthD("J") + 4, volumeIconY, hexColor(1, 1, 1, alpha * .5f));
 
         double volumeBarXOffset = elementsXOffset + FontManager.music40.getStringWidthD("I") - 2;
-        roundedRect(volumeBarXOffset, volumeBarYOffset - volumeBarHeight * .5, volumeBarWidth, volumeBarHeight, (this.volumeBarHeight / 8.0f) * 2.5, hexColor(1, 1, 1, alpha * .5f));
+        roundedRect(volumeBarXOffset, volumeBarYOffset - volumeBarHeight * .5, volumeBarWidth, volumeBarHeight, (this.volumeBarHeight / 8.0f) * 2.5, hexColor(1, 1, 1, alpha * .22f));
         StencilClipManager.beginClip(() -> Rect.draw(volumeBarXOffset, volumeBarYOffset - volumeBarHeight * .5, volumeBarWidth * (player == null ? 0 : player.getVolume()), volumeBarHeight, -1));
         roundedRect(volumeBarXOffset, volumeBarYOffset - volumeBarHeight * .5, volumeBarWidth, volumeBarHeight, (this.volumeBarHeight / 8.0f) * 2.5, hexColor(1, 1, 1, alpha));
         StencilClipManager.endClip();
 
         boolean hoveringVolumeBar = this.isHovered(mouseX, mouseY, volumeBarXOffset, volumeBarYOffset - volumeBarHeight * .5, volumeBarWidth, 8);
         this.volumeBarHeight = Interpolations.interpolate(this.volumeBarHeight, hoveringVolumeBar ? 8 : 5, 0.3f);
+
+        this.volumeThumbAlpha = Interpolations.interpolate(this.volumeThumbAlpha, hoveringVolumeBar ? 1.0 : 0.0, 0.25f);
+
         if (hoveringVolumeBar && lmbDown) {
             double xDelta = Math.max(0, Math.min(volumeBarWidth, (mouseX - (volumeBarXOffset))));
             double percent = xDelta / volumeBarWidth;
@@ -836,9 +878,49 @@ public class MusicLyricsPanel implements SharedRenderingConstants, SharedConstan
     }
 
     public void mouseClicked(double mouseX, double mouseY, int mouseButton) {
+        if (contextMenu.handleClick(mouseX, mouseY, mouseButton)) return;
+        if (mouseButton == 1) {
+            openLyricsProviderMenu(mouseX, mouseY);
+            return;
+        }
         playPauseButton.onMouseClickReceived(mouseX, mouseY, mouseButton);
         prev.onMouseClickReceived(mouseX, mouseY, mouseButton);
         next.onMouseClickReceived(mouseX, mouseY, mouseButton);
+    }
+
+    private void openLyricsProviderMenu(double mouseX, double mouseY) {
+        Music current = CloudMusic.currentlyPlaying == null ? music : CloudMusic.currentlyPlaying;
+        long request = ++providerMenuRequest;
+        contextMenu.open(mouseX, mouseY, List.of(new ContextMenuWidget.Item(I18n.get("tritium-music.ui.lyrics.checking_sources"), null, false, false)));
+        MultiThreadingUtil.runAsync(() -> {
+            List<LyricsFetcher.AvailableLyrics> available = CloudMusic.availableLyrics(current);
+            String selected = CloudMusic.selectedLyricsProvider(current);
+            MultiThreadingUtil.runOnMainThread(() -> {
+                if (request != providerMenuRequest || !contextMenu.isOpen()
+                        || CloudMusic.currentlyPlaying == null || CloudMusic.currentlyPlaying.getId() != current.getId()) return;
+                if (available.isEmpty()) {
+                    contextMenu.updateItems(List.of(new ContextMenuWidget.Item(I18n.get("tritium-music.ui.lyrics.no_sources"), null, false, false)));
+                    return;
+                }
+                contextMenu.updateItems(available.stream()
+                        .map(provider -> new ContextMenuWidget.Item(providerName(provider.id(), provider.displayName())
+                                        + (provider.wordTimed() ? I18n.get("tritium-music.ui.lyrics.word_timed_suffix") : ""),
+                                () -> CloudMusic.selectLyricsProvider(current, provider.id()),
+                                provider.id().equals(selected) || selected.isBlank()
+                                        && CloudMusic.currentLyricsSongId == current.getId()
+                                        && provider.id().equals(CloudMusic.currentLyricsSource), true))
+                        .toList());
+            });
+        });
+    }
+
+    private static String providerName(String id, String fallback) {
+        return switch (id) {
+            case "local" -> I18n.get("tritium-music.ui.lyrics.provider.local");
+            case "netease" -> I18n.get("tritium-music.ui.lyrics.provider.netease");
+            case "qq" -> I18n.get("tritium-music.ui.lyrics.provider.qq");
+            default -> fallback;
+        };
     }
 
     private String formatDuration(float totalMillis) {
@@ -879,26 +961,46 @@ public class MusicLyricsPanel implements SharedRenderingConstants, SharedConstan
 
             api.getGLStateManager().pushMatrix();
 
-            float lowFreqEnergy = calculateLowFrequencyEnergy();
-            
-            if (!Double.isFinite(fftScale)) fftScale = 0;
-            if (!Float.isFinite(lowFreqEnergy) || lowFreqEnergy <= 0.01f) lowFreqEnergy = 0;
-            
-            float scaledEnergy = (float) Math.log1p(lowFreqEnergy * 10) * 0.05f;
-            
-            float damping = lowFreqEnergy > fftScale ? 0.3f : 0.6f;
-            fftScale = Interpolations.interpolate(fftScale, scaledEnergy, damping);
+            updateFftScale();
+            scaleAtPos(RenderSystem.getWidth() * .5, RenderSystem.getHeight() * .5, 1 + Math.max(0, fftScale) * .1);
 
-            scaleAtPos(RenderSystem.getWidth() * .5, RenderSystem.getHeight() * .5, 1 + fftScale);
+            if (coverFloatTimer.isDelayed(4000)) {
+                coverFloatTargetX = Math.random();
+                coverFloatTargetY = Math.random();
+                coverFloatTimer.reset();
+            }
 
-            double bgSize = Math.max(width, height);
+            if (!CloudMusic.player.isPausing()) {
+                coverFloatX = Interpolations.interpolateLinear(coverFloatX, coverFloatTargetX, 0.0035f);
+                coverFloatY = Interpolations.interpolateLinear(coverFloatY, coverFloatTargetY, 0.0035f);
+            }
+
+            int tileSize = 1000;
+            int cropSize = 600;
+            int maxOffset = tileSize - cropSize;
+            float cropU = (float) Mth.limit(coverFloatX * maxOffset, 0, maxOffset);
+            float cropV = (float) Mth.limit(coverFloatY * maxOffset, 0, maxOffset);
+
+            double renderTileWidth, renderTileHeight;
+
+            if (width > height) {
+                renderTileWidth = tileSize;
+                renderTileHeight = tileSize * (width / height);
+            } else {
+                renderTileWidth = tileSize * (height / width);
+                renderTileHeight = tileSize;
+            }
+
+            api.getGLStateManager().enableBlend();
+            api.getGLStateManager().disableAlpha();
+            api.getGLStateManager().tryBlendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ZERO);
+            api.getGLStateManager().enableTexture2D();
 
             if (prevBg != null && musicBgAlpha < 0.99f) {
-                int glTextureId = prevBg.getGlTextureId();
-                api.getGLStateManager().bindTexture(glTextureId);
+                api.getGLStateManager().bindTexture(prevBg.getGlTextureId());
                 prevBg.linearFilter();
                 api.getGLStateManager().color(1, 1, 1, alpha);
-                Image.draw(posX + width * .5 - bgSize * .5, posY + height * .5 - bgSize * .5, bgSize, bgSize, Image.Type.NoColor);
+                Image.drawScaledCustomSizeModalRect(posX, posY, cropU, cropV, cropSize, cropSize, width, height, renderTileWidth, renderTileHeight);
             }
 
             if (texBg != null) {
@@ -906,49 +1008,82 @@ public class MusicLyricsPanel implements SharedRenderingConstants, SharedConstan
                 api.getGLStateManager().bindTexture(texBg.getGlTextureId());
                 texBg.linearFilter();
                 api.getGLStateManager().color(1, 1, 1, alpha * this.musicBgAlpha);
-                Image.draw(posX + width * .5 - bgSize * .5, posY + height * .5 - bgSize * .5, bgSize, bgSize, Image.Type.NoColor);
+                Image.drawScaledCustomSizeModalRect(posX, posY, cropU, cropV, cropSize, cropSize, width, height, renderTileWidth, renderTileHeight);
             }
 
             api.getGLStateManager().popMatrix();
         }
 
-        Rect.draw(posX, posY, width, height, hexColor(0, 0, 0, alpha * .35f));
+        Rect.draw(posX, posY, width, height, hexColor(0f, 0f, 0f, alpha * .42f));
+
+        double fadeH = height * 0.22;
+        RenderSystem.drawGradientRectTopToBottom(posX, posY, posX + width, posY + fadeH, hexColor(0f, 0f, 0f, alpha * .5f), hexColor(0f, 0f, 0f, 0f));
+        RenderSystem.drawGradientRectTopToBottom(posX, posY + height - fadeH, posX + width, posY + height, hexColor(0f, 0f, 0f, 0f), hexColor(0f, 0f, 0f, alpha * .55f));
+
+        double sideW = width * 0.16;
+        RenderSystem.drawGradientRectLeftToRight(posX, posY, posX + sideW, posY + height, hexColor(0f, 0f, 0f, alpha * .35f), hexColor(0f, 0f, 0f, 0f));
+        RenderSystem.drawGradientRectLeftToRight(posX + width - sideW, posY, posX + width, posY + height, hexColor(0f, 0f, 0f, 0f), hexColor(0f, 0f, 0f, alpha * .35f));
     }
 
-    private float calculateLowFrequencyEnergy() {
-        if (AudioPlayer.bandValues == null || AudioPlayer.bandValues.length == 0) {
-            return 0.0f;
-        }
+    private void updateFftScale() {
+        BassFrame frame = sampleBassFrame();
+        long now = System.nanoTime();
+        double deltaSeconds = Mth.limit((now - lastBassUpdateNanos) / 1_000_000_000.0, 1.0 / 240.0, 0.05);
+        lastBassUpdateNanos = now;
+        boolean playing = CloudMusic.player != null && !CloudMusic.player.isPausing();
 
-        int lowFreqBands = Math.min(12, AudioPlayer.bandValues.length);
-        
-        float totalWeight = 0.0f;
-        float weightedSum = 0.0f;
-        
-        for (int i = 0; i < lowFreqBands; i++) {
-            float weight = (float) Math.exp(-i * 0.2f);
-            float bandValue = AudioPlayer.bandValues[i];
-            
-            bandValue = Math.min(bandValue, 2.0f);
-            
-            weightedSum += bandValue * weight;
+        if (!playing || !Double.isFinite(frame.energy) || frame.energy < 0.008) {
+            fftScale += (0 - fftScale) * expResponse(5.0, deltaSeconds);
+            return;
+        }
+        if (bassBaseline <= 0 || !Double.isFinite(bassBaseline)) bassBaseline = frame.energy;
+        double baselineRate = frame.energy > bassBaseline ? 0.7 : 2.8;
+        bassBaseline += (frame.energy - bassBaseline) * expResponse(baselineRate, deltaSeconds);
+        double deviation = Math.abs(frame.energy - bassBaseline);
+        bassDeviation += (deviation - bassDeviation) * expResponse(1.8, deltaSeconds);
+        bassDeviation = Mth.limit(bassDeviation, 0.008, 0.25);
+        double relativeRise = Math.max(0, frame.energy - bassBaseline) / (bassDeviation * 1.6 + 0.012);
+        double spectralAttack = frame.flux / (bassDeviation + 0.01);
+        double drive = relativeRise * 0.85 + spectralAttack * 2.4;
+        double activityGate = Mth.limit((frame.energy - 0.015) / 0.10, 0, 1);
+        double target = Mth.limit((1.0 - Math.exp(-drive)) * activityGate, 0, 1);
+        double response = target > fftScale ? 18.0 : 5.5;
+        fftScale += (target - fftScale) * expResponse(response, deltaSeconds);
+        if (!Double.isFinite(fftScale)) fftScale = 0;
+    }
+
+    private BassFrame sampleBassFrame() {
+        float[] bands = AudioPlayer.bandValues;
+        if (bands == null || bands.length == 0) return new BassFrame(0, 0);
+        if (previousBassSpectrum.length != bands.length) previousBassSpectrum = new float[bands.length];
+        int start = frequencyBand(35, bands.length);
+        int end = Math.min(Math.max(start + 1, frequencyBand(220, bands.length)), bands.length - 1);
+        double energy = 0;
+        double flux = 0;
+        double totalWeight = 0;
+        for (int i = start; i <= end; i++) {
+            double frequency = 20.0 * Math.pow(1000.0, (i + 0.5) / bands.length);
+            double octaveDistance = Math.log(frequency / 90.0) / Math.log(2.0);
+            double weight = Math.exp(-0.5 * Math.pow(octaveDistance / 0.9, 2));
+            float value = Float.isFinite(bands[i]) ? (float) Mth.limit(bands[i], 0, 1) : 0;
+            double rise = Math.max(0, value - previousBassSpectrum[i]);
+            energy += value * value * weight;
+            flux += rise * rise * weight;
             totalWeight += weight;
+            previousBassSpectrum[i] = value;
         }
-        
-        if (totalWeight <= 0.0f) {
-            return 0.0f;
-        }
-        
-        float weightedAverage = weightedSum / totalWeight;
-        
-        float rms = 0.0f;
-        for (int i = 0; i < lowFreqBands; i++) {
-            float bandValue = AudioPlayer.bandValues[i];
-            bandValue = Math.min(bandValue, 2.0f);
-            rms += bandValue * bandValue;
-        }
-        rms = (float) Math.sqrt(rms / lowFreqBands);
-        
-        return (weightedAverage * 0.7f + rms * 0.3f);
+        return totalWeight <= 0 ? new BassFrame(0, 0) : new BassFrame(Math.sqrt(energy / totalWeight), Math.sqrt(flux / totalWeight));
+    }
+
+    private static int frequencyBand(double frequency, int bandCount) {
+        double position = Math.log(frequency / 20.0) / Math.log(1000.0);
+        return (int) Mth.limit(Math.floor(position * bandCount), 0, bandCount - 1);
+    }
+
+    private static double expResponse(double rate, double deltaSeconds) {
+        return 1.0 - Math.exp(-rate * deltaSeconds);
+    }
+
+    private record BassFrame(double energy, double flux) {
     }
 }

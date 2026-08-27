@@ -1,6 +1,7 @@
 package tritium.screens.ncm;
 
 import com.google.gson.JsonObject;
+import tritium.ncm.lyric.provider.LyricsResult;
 import tritium.utils.Tuple;
 
 import java.util.*;
@@ -8,6 +9,103 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class LyricParser {
+    private static final long QQ_QRC_ADVANCE_MILLIS = 150;
+    private static final Pattern QQ_CREDIT_LINE = Pattern.compile(
+            "(?i)^\\s*(?:歌曲(?:名称)?|歌名|曲名|歌手|演唱|主唱|作词|填词|词|作曲|谱曲|曲|编曲|制作人?|监制|混音|录音|母带|吉他|贝斯|鼓|和声|弦乐|音乐总监|发行|出品|制作|配唱|title|artist|singer|vocal|lyrics?|lyricist|composer|arranger|producer|mix(?:ing)?|master(?:ing)?|recording|guitar|bass|drums?|chorus|op|sp)(?:\\s*[:：/]|\\s+-\\s+|\\s+).+$");
+    private static final Pattern QQ_TITLE_ARTIST_LINE = Pattern.compile("^.{1,80}\\s[-–—]\\s.{1,80}$");
+
+    public static List<LyricLine> parse(LyricsResult result) {
+        if (result == null || result.isEmpty()) return new ArrayList<>();
+        if ("netease".equals(result.format())) {
+            return parse(new com.google.gson.JsonParser().parse(result.lyrics()).getAsJsonObject());
+        }
+        if ("ttml".equals(result.format())) {
+            return TtmlLyricParser.parse(result.lyrics());
+        }
+        if ("qrc".equals(result.format())) {
+            List<LyricLine> lines = parseQrc(result.lyrics());
+            removeQqCredits(lines);
+            if (result.translation() != null && !result.translation().isBlank()) {
+                applySecondaryLyrics(lines, parseQqSecondary(result.translation()), true, 100);
+            }
+            if (result.romanization() != null && !result.romanization().isBlank()) {
+                applySecondaryLyrics(lines, parseQqSecondary(result.romanization()), false, 100);
+            }
+            advanceQqTimeline(lines);
+            return lines;
+        }
+        if ("plain".equals(result.format())) {
+            return List.of(new LyricLine(0, result.lyrics().trim()));
+        }
+        List<LyricLine> lines = new ArrayList<>(parseSingleLine(replace(result.lyrics())));
+        if (result.translation() != null && !result.translation().isBlank()) {
+            applySecondaryLyrics(lines, parseSingleLine(replace(result.translation())), true);
+        }
+        if (result.romanization() != null && !result.romanization().isBlank()) {
+            applySecondaryLyrics(lines, parseSingleLine(replace(result.romanization())), false);
+        }
+        return lines;
+    }
+
+    private static List<LyricLine> parseQrc(String input) {
+        List<LyricLine> lines = new ArrayList<>();
+        Pattern linePattern = Pattern.compile("\\[(\\d+),(\\d+)](.*?)(?=\\[\\d+,\\d+]|$)", Pattern.DOTALL);
+        Pattern wordPattern = Pattern.compile("(.*?)\\((\\d+),(\\d+)\\)");
+        Matcher lineMatcher = linePattern.matcher(input);
+        while (lineMatcher.find()) {
+            long timestamp = Long.parseLong(lineMatcher.group(1));
+            long duration = Long.parseLong(lineMatcher.group(2));
+            Matcher wordMatcher = wordPattern.matcher(lineMatcher.group(3));
+            List<LyricLine.Word> words = new ArrayList<>();
+            StringBuilder lyric = new StringBuilder();
+            while (wordMatcher.find()) {
+                String word = wordMatcher.group(1);
+                long wordTimestamp = Long.parseLong(wordMatcher.group(2));
+                long wordDuration = Long.parseLong(wordMatcher.group(3));
+                if (word.isEmpty()) continue;
+                lyric.append(word);
+                words.add(new LyricLine.Word(word, wordTimestamp, wordDuration));
+            }
+            if (lyric.isEmpty()) continue;
+            LyricLine line = new LyricLine(timestamp, lyric.toString());
+            line.duration = duration;
+            line.words.addAll(words);
+            lines.add(line);
+        }
+        lines.sort(Comparator.comparingLong(LyricLine::getTimestamp));
+        return lines;
+    }
+
+    private static void advanceQqTimeline(List<LyricLine> lines) {
+        for (LyricLine line : lines) {
+            line.timestamp = Math.max(0, line.timestamp - QQ_QRC_ADVANCE_MILLIS);
+            List<LyricLine.Word> shiftedWords = new ArrayList<>(line.words.size());
+            for (LyricLine.Word word : line.words) {
+                shiftedWords.add(new LyricLine.Word(
+                        word.word,
+                        Math.max(0, word.timestamp - QQ_QRC_ADVANCE_MILLIS),
+                        word.duration
+                ));
+            }
+            line.words.clear();
+            line.words.addAll(shiftedWords);
+        }
+    }
+
+    private static void removeQqCredits(List<LyricLine> lines) {
+        int removeCount = 0;
+        for (LyricLine line : lines) {
+            String text = line.lyric.strip();
+            if (!QQ_CREDIT_LINE.matcher(text).matches() && !QQ_TITLE_ARTIST_LINE.matcher(text).matches()) break;
+            removeCount++;
+        }
+        if (removeCount > 0) lines.subList(0, removeCount).clear();
+    }
+
+    private static List<LyricLine> parseQqSecondary(String input) {
+        if (Pattern.compile("\\[\\d+,\\d+]").matcher(input).find()) return parseQrc(input);
+        return parseSingleLine(replace(input));
+    }
 
     public static List<LyricLine> parse(JsonObject input) {
         if (input.has("uncollected") || !input.has("lrc")) {
@@ -30,8 +128,7 @@ public class LyricParser {
     }
 
     private static String replace(String input) {
-        //        System.out.println(s);
-        return input.replace(' ', ' ').replaceAll(" {2,}", " ");
+        return input.replace(' ', ' ').replaceAll(" {2,}", " ");
     }
 
     private static void processTranslationLyricsYRC(JsonObject input, List<LyricLine> lyricLines) {
@@ -51,7 +148,6 @@ public class LyricParser {
             String translation = transMap.get(l.timestamp);
 
             if (translation == null) {
-                System.out.println("Translation not found for " + l.lyric + " at " + l.timestamp);
                 continue;
             }
 
@@ -103,6 +199,33 @@ public class LyricParser {
         }
     }
 
+    private static void applySecondaryLyrics(List<LyricLine> lyricLines, List<LyricLine> secondary, boolean translation) {
+        applySecondaryLyrics(lyricLines, secondary, translation, 0);
+    }
+
+    private static void applySecondaryLyrics(List<LyricLine> lyricLines, List<LyricLine> secondary, boolean translation, long tolerance) {
+        Map<Long, String> values = new HashMap<>();
+        for (LyricLine line : secondary) values.put(line.timestamp, line.lyric);
+        for (LyricLine line : lyricLines) {
+            String value = values.get(line.timestamp);
+            if (value == null && tolerance > 0) {
+                LyricLine closest = null;
+                long distance = Long.MAX_VALUE;
+                for (LyricLine candidate : secondary) {
+                    long candidateDistance = Math.abs(candidate.timestamp - line.timestamp);
+                    if (candidateDistance < distance) {
+                        closest = candidate;
+                        distance = candidateDistance;
+                    }
+                }
+                if (closest != null && distance <= tolerance) value = closest.lyric;
+            }
+            if (value == null) continue;
+            if (translation && line.translationText == null) line.translationText = value;
+            if (!translation && line.romanizationText == null) line.romanizationText = value;
+        }
+    }
+
     private static void processRomanizationLyrics(JsonObject input, List<LyricLine> lyricLines) {
         if (!input.has("romalrc")) return;
 
@@ -146,7 +269,6 @@ public class LyricParser {
         }
         boolean alt = false;
         input = input.trim();
-//        System.out.println("input = " + input);
         Matcher lineMatcher = Pattern.
                 compile("((?:\\[\\d{2}:\\d{2}\\.\\d{2,3}])+)(.*)").matcher(input);
         if (!lineMatcher.matches()) {
@@ -169,14 +291,14 @@ public class LyricParser {
             long min = Long.parseLong(timeMatcher.group(1));
             long sec = Long.parseLong(timeMatcher.group(2));
             String milStr = timeMatcher.group(3);
-            
+
             long mil;
             if (milStr.length() == 3) {
                 mil = Long.parseLong(milStr);
             } else {
                 mil = Long.parseLong(milStr) * 10;
             }
-            
+
             long time =
                     min * 60000 +
                             sec * 1000 +
@@ -197,7 +319,6 @@ public class LyricParser {
             String line = lines[i];
             if (!line.startsWith("[")) continue;
 
-            // 解析时间信息
             String timeData = line.substring(1, line.indexOf("]"));
             String[] timeParts = timeData.split(",");
             long startDuration = Long.parseLong(timeParts[0]);
@@ -218,16 +339,6 @@ public class LyricParser {
 
             l.lyric = sb.toString();
 
-//            MusicLyricsWidget.ScrollTiming timing = new MusicLyricsWidget.ScrollTiming();
-//            timing.start = startDuration;
-//            timing.duration = duration;
-//            timing.text = line.substring(line.indexOf("]") + 1);
-
-//            if (timing.text.isEmpty())
-//                continue;
-
-//            parseWordTimings(timing);
-//            MusicLyricsWidget.timings.add(timing);
             lyricLines.add(l);
         }
     }
@@ -248,20 +359,19 @@ public class LyricParser {
             long duration = Long.parseLong(metadataParts[1]);
 
             if (duration <= 0 && !words.isEmpty()) {
-                // wtf
                 Tuple<String, Tuple<Long, Long>> last = words.getLast();
-                last.setA(last.getA() + lyric);
+                words.set(words.size() - 1, new Tuple<>(last.getA() + lyric, last.getB()));
             } else {
-                words.add(Tuple.of(lyric, new Tuple<>(timestamp, duration)));
+                words.add(new Tuple<>(lyric, new Tuple<>(timestamp, duration)));
             }
         }
 
         words.stream().map(
-        t -> new LyricLine.Word(
-                t.getA(),
-                t.getB().getA(),
-                t.getB().getB()
-            )
+                t -> new LyricLine.Word(
+                        t.getA(),
+                        t.getB().getA(),
+                        t.getB().getB()
+                )
         ).forEach(l.words::add);
     }
 }

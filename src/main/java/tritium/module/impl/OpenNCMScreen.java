@@ -21,7 +21,7 @@ public class OpenNCMScreen extends ExtensionModule implements SharedConstants, E
         super("Tritium Music", "Open tritium music gui", EnumModuleCategory.MISC);
         this.setEventHandler(this);
 
-        this.addValues(this.quality, this.musicToast, this.boundaries, this.lyricDebug);
+        this.addValues(this.quality, this.playlistView, this.musicToast, this.boundaries, this.lyricDebug);
 
         this.boundaries.setValueCallback(b -> ClientSettings.SHOW_WIDGET_BOUNDARY = b);
         this.lyricDebug.setValueCallback(b -> ClientSettings.DEBUG_MODE = b);
@@ -39,6 +39,7 @@ public class OpenNCMScreen extends ExtensionModule implements SharedConstants, E
     }
 
     public ModeValue quality = api.getValueManager().createModes("Music Quality", "Standard", new String[] { "Standard", "Higher", "ExHigh", "LossLess", "HiRes", "JyEffect", "Sky", "JyMaster" });
+    public ModeValue playlistView = api.getValueManager().createModes("Playlist View", "Grid", new String[] { "List", "Grid" });
     public BooleanValue musicToast = api.getValueManager().createBoolean("Music Toast", true);
 
     public BooleanValue boundaries = api.getValueManager().createBoolean("Show UI Widget Boundary", false);

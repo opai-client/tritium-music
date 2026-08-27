@@ -22,13 +22,12 @@ public final class DeviceIdGenerator {
     public static String generate() {
         try {
             String fingerprint = collect();
-//            System.out.println(fingerprint);
 
             MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
             sha256.update(SALT.getBytes(StandardCharsets.UTF_8));
             sha256.update(fingerprint.getBytes(StandardCharsets.UTF_8));
 
-            return toHex(sha256.digest()).substring(0, 51);
+            return toHex(sha256.digest()).substring(0, 52);
         } catch (Exception e) {
             throw new RuntimeException("Failed to generate device id", e);
         }
@@ -70,7 +69,6 @@ public final class DeviceIdGenerator {
         properties.put("OSVersion", System.getProperty("os.version"));
         properties.put("Arch", System.getProperty("os.arch"));
 
-        // cpu name
         try {
             String processorNameString = Advapi32Util.registryGetStringValue
                     (HKEY_LOCAL_MACHINE,
@@ -79,9 +77,9 @@ public final class DeviceIdGenerator {
 
             if (processorNameString != null)
                 properties.put("CPU", processorNameString);
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
-        // adapter mac addr
         try {
             NetworkInterface.networkInterfaces().forEach(networkInterface -> {
                 try {
@@ -92,7 +90,8 @@ public final class DeviceIdGenerator {
                 } catch (Exception ignored) {
                 }
             });
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         for (Map.Entry<String, String> stringStringEntry : properties.entrySet()) {
             sb.append(stringStringEntry.getKey()).append("=").append(stringStringEntry.getValue()).append("\n");

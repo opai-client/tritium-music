@@ -19,9 +19,25 @@ import java.util.List;
 
 public class GaussianBlurShader extends Shader {
 
+    private static final int DOWNSAMPLE = 2;
+
+    private static int bufferWidth() {
+        return Math.max(1, Display.getWidth() / DOWNSAMPLE);
+    }
+
+    private static int bufferHeight() {
+        return Math.max(1, Display.getHeight() / DOWNSAMPLE);
+    }
+
+    private static Framebuffer createBlurBuffer() {
+        Framebuffer fb = new Framebuffer(bufferWidth(), bufferHeight(), true);
+        fb.setFramebufferFilter(GL11.GL_LINEAR);
+        return fb;
+    }
+
     private final ShaderProgram blurProgram = new ShaderProgram("blur.frag", "vertex.vsh");
-    private Framebuffer inputFramebuffer = new Framebuffer(Display.getWidth(), Display.getHeight(), true);
-    private Framebuffer outputFramebuffer = new Framebuffer(Display.getWidth(), Display.getHeight(), true);
+    private Framebuffer inputFramebuffer = createBlurBuffer();
+    private Framebuffer outputFramebuffer = createBlurBuffer();
     private GaussianKernel gaussianKernel = new GaussianKernel(0);
 
     private final Uniform1i u_radius = new Uniform1i(blurProgram, "u_radius");
@@ -102,16 +118,20 @@ public class GaussianBlurShader extends Shader {
         }
     }
 
+    public void runNoCaching(List<Runnable> runnable) {
+        run(runnable);
+    }
+
     @Override
     public void update() {
         this.setActive(false);
 
-        if (Display.getWidth() != inputFramebuffer.framebufferWidth || Display.getHeight() != inputFramebuffer.framebufferHeight) {
+        if (bufferWidth() != inputFramebuffer.framebufferWidth || bufferHeight() != inputFramebuffer.framebufferHeight) {
             inputFramebuffer.deleteFramebuffer();
-            inputFramebuffer = new Framebuffer(Display.getWidth(), Display.getHeight(), true);
+            inputFramebuffer = createBlurBuffer();
 
             outputFramebuffer.deleteFramebuffer();
-            outputFramebuffer = new Framebuffer(Display.getWidth(), Display.getHeight(), true);
+            outputFramebuffer = createBlurBuffer();
 
         } else {
 //            inputFramebuffer.framebufferClear();

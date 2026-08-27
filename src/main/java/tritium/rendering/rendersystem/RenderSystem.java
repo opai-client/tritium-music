@@ -220,6 +220,36 @@ public class RenderSystem implements SharedConstants {
 //        api.getGLStateManager().enableAlpha();
 //        api.getGLStateManager().enableTexture2D();
     }
+
+    public static void drawGradientRectTopToBottom(double left, double top, double right, double bottom, int startColor, int endColor) {
+        float startAlpha = (startColor >> 24 & 0xFF) * DIVIDE_BY_255;
+        float startRed = (startColor >> 16 & 0xFF) * DIVIDE_BY_255;
+        float startGreen = (startColor >> 8 & 0xFF) * DIVIDE_BY_255;
+        float startBlue = (startColor & 0xFF) * DIVIDE_BY_255;
+        float endAlpha = (endColor >> 24 & 0xFF) * DIVIDE_BY_255;
+        float endRed = (endColor >> 16 & 0xFF) * DIVIDE_BY_255;
+        float endGreen = (endColor >> 8 & 0xFF) * DIVIDE_BY_255;
+        float endBlue = (endColor & 0xFF) * DIVIDE_BY_255;
+
+        api.getGLStateManager().disableTexture2D();
+        api.getGLStateManager().enableBlend();
+        api.getGLStateManager().disableAlpha();
+        api.getGLStateManager().tryBlendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ZERO);
+        api.getGLStateManager().shadeModel(GL11.GL_SMOOTH);
+
+        GL11.glBegin(GL11.GL_QUADS);
+        api.getGLStateManager().color(endRed, endGreen, endBlue, endAlpha);
+        GL11.glVertex2d(left, bottom);
+        GL11.glVertex2d(right, bottom);
+        api.getGLStateManager().color(startRed, startGreen, startBlue, startAlpha);
+        GL11.glVertex2d(right, top);
+        GL11.glVertex2d(left, top);
+        GL11.glEnd();
+
+        api.getGLStateManager().shadeModel(GL11.GL_FLAT);
+        api.getGLStateManager().enableAlpha();
+        api.getGLStateManager().enableTexture2D();
+    }
 //
 //    public static void drawGradientRectBottomToTop(final double left, final double top, final double right, final double bottom, final int startColor, final int endColor) {
 //        final float sa = (startColor >> 24 & 0xFF) * 0.003921568627451F;
@@ -361,6 +391,26 @@ public class RenderSystem implements SharedConstants {
         Rect.draw(x - thickness, y - thickness, thickness, height + thickness, color, Rect.RectType.EXPAND);
         Rect.draw(x + width, y - thickness, thickness, height + thickness, color, Rect.RectType.EXPAND);
         Rect.draw(x - thickness, y + height, width + thickness * 2, thickness, color, Rect.RectType.EXPAND);
+    }
+
+    public static void doScissor(double x, double y, double width, double height) {
+        if (width <= 0 || height <= 0 || getWidth() <= 0 || getHeight() <= 0) {
+            return;
+        }
+
+        double scaleX = Display.getWidth() / getWidth();
+        double scaleY = Display.getHeight() / getHeight();
+        int scissorX = (int) Math.floor(x * scaleX);
+        int scissorY = (int) Math.floor((getHeight() - y - height) * scaleY);
+        int scissorWidth = Math.max(0, (int) Math.ceil(width * scaleX));
+        int scissorHeight = Math.max(0, (int) Math.ceil(height * scaleY));
+
+        GL11.glEnable(GL11.GL_SCISSOR_TEST);
+        GL11.glScissor(scissorX, scissorY, scissorWidth, scissorHeight);
+    }
+
+    public static void endScissor() {
+        GL11.glDisable(GL11.GL_SCISSOR_TEST);
     }
 
     public static Color getOppositeColor(Color colorIn) {

@@ -47,13 +47,14 @@ public class LyricLine {
     public boolean renderEmphasizes = true;
     public boolean isBreakLine = false;
 
-    public final SpringAnimation spring = new SpringAnimation(new SpringParams(.9, 15, 90, false));
+    public final SpringAnimation spring = new SpringAnimation(new SpringParams(.9, 14, 90, false));
 
     // MusicLyricsWidgets fields
     public double scrollWidth = 0;
     public double offsetX = 0;
     public double targetOffsetX = 0;
     public float lineAlpha = .4f;
+    public float auroraGlow = 0f;
 
     public double offsetY = Double.MIN_VALUE;
 

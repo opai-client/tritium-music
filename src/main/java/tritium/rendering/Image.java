@@ -288,6 +288,22 @@ public class Image implements SharedConstants {
         GL11.glEnd();
     }
 
+    public static void drawScaledCustomSizeModalRect(double x, double y, double u, double v, double uWidth, double vHeight, double width, double height, double textureWidth, double textureHeight) {
+        double inverseWidth = 1.0 / textureWidth;
+        double inverseHeight = 1.0 / textureHeight;
+
+        GL11.glBegin(GL11.GL_QUADS);
+        GL11.glTexCoord2d(u * inverseWidth, (v + vHeight) * inverseHeight);
+        GL11.glVertex2d(x, y + height);
+        GL11.glTexCoord2d((u + uWidth) * inverseWidth, (v + vHeight) * inverseHeight);
+        GL11.glVertex2d(x + width, y + height);
+        GL11.glTexCoord2d((u + uWidth) * inverseWidth, v * inverseHeight);
+        GL11.glVertex2d(x + width, y);
+        GL11.glTexCoord2d(u * inverseWidth, v * inverseHeight);
+        GL11.glVertex2d(x, y);
+        GL11.glEnd();
+    }
+
     public static void drawModalRectWithCustomSizedTextureFlippedY(double x, double y, double u, double v, double width, double height, double textureWidth, double textureHeight) {
         double f = 1.0F / textureWidth;
         double f1 = 1.0F / textureHeight;

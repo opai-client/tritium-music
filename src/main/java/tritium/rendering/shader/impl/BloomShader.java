@@ -20,9 +20,25 @@ import java.util.List;
 
 public class BloomShader extends Shader {
 
+    private static final int DOWNSAMPLE = 2;
+
+    private static int bufferWidth() {
+        return Math.max(1, Display.getWidth() / DOWNSAMPLE);
+    }
+
+    private static int bufferHeight() {
+        return Math.max(1, Display.getHeight() / DOWNSAMPLE);
+    }
+
+    private static Framebuffer createBloomBuffer() {
+        Framebuffer fb = new Framebuffer(bufferWidth(), bufferHeight(), true);
+        fb.setFramebufferFilter(GL11.GL_LINEAR);
+        return fb;
+    }
+
     private final ShaderProgram bloomProgram = new ShaderProgram("bloom.frag", "vertex.vsh");
-    private Framebuffer inputFramebuffer = new Framebuffer(Display.getWidth(), Display.getHeight(), true);
-    private Framebuffer outputFramebuffer = new Framebuffer(Display.getWidth(), Display.getHeight(), true);
+    private Framebuffer inputFramebuffer = createBloomBuffer();
+    private Framebuffer outputFramebuffer = createBloomBuffer();
     private GaussianKernel gaussianKernel = new GaussianKernel(0);
 
     private final Uniform1f u_radius = new Uniform1f(bloomProgram, "u_radius");
@@ -106,12 +122,12 @@ public class BloomShader extends Shader {
 
     @Override
     public void update() {
-        if (Display.getWidth() != inputFramebuffer.framebufferWidth || Display.getHeight() != inputFramebuffer.framebufferHeight) {
+        if (bufferWidth() != inputFramebuffer.framebufferWidth || bufferHeight() != inputFramebuffer.framebufferHeight) {
             inputFramebuffer.deleteFramebuffer();
-            inputFramebuffer = new Framebuffer(Display.getWidth(), Display.getHeight(), true);
+            inputFramebuffer = createBloomBuffer();
 
             outputFramebuffer.deleteFramebuffer();
-            outputFramebuffer = new Framebuffer(Display.getWidth(), Display.getHeight(), true);
+            outputFramebuffer = createBloomBuffer();
 
         } else {
 //            inputFramebuffer.framebufferClear();

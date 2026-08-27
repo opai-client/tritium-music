@@ -18,6 +18,7 @@ import tritium.rendering.ui.widgets.RoundedImageWidget;
 import tritium.screens.ncm.NCMPanel;
 import tritium.screens.ncm.NCMScreen;
 import tritium.utils.Location;
+import tritium.utils.I18n;
 import tritium.utils.json.JsonUtils;
 import tritium.utils.other.multithreading.MultiThreadingUtil;
 
@@ -84,7 +85,7 @@ public class HomePanel extends NCMPanel {
     public ScrollPanel scrollPanel;
 
     private void layout() {
-        LabelWidget lblWelcome = new LabelWidget("欢迎来到 Tritium Music!", FontManager.pf25bold);
+        LabelWidget lblWelcome = new LabelWidget(I18n.get("tritium-music.ui.home.welcome"), FontManager.pf25bold);
 
         this.addChild(lblWelcome);
 
@@ -94,7 +95,7 @@ public class HomePanel extends NCMPanel {
                 .setPosition(margin, margin)
                 .setColor(NCMScreen.getColor(NCMScreen.ColorType.PRIMARY_TEXT)));
 
-        LabelWidget lblRecommendations = new LabelWidget("推荐歌单", FontManager.pf14bold);
+        LabelWidget lblRecommendations = new LabelWidget(I18n.get("tritium-music.ui.home.recommended_playlists"), FontManager.pf14bold);
 
         this.addChild(lblRecommendations);
 
@@ -120,7 +121,10 @@ public class HomePanel extends NCMPanel {
                                 scrollPanel.getHeight() - lblWelcome.getHeight() - margin
                         ));
 
-        playLists.forEach(pl -> scrollPanel.addChild(new PlaylistWidget(pl).setShouldOverrideMouseCursor(true)));
+        long revealStart = System.currentTimeMillis();
+        for (int i = 0; i < playLists.size(); i++) {
+            scrollPanel.addChild(new PlaylistWidget(playLists.get(i), i, revealStart).setShouldOverrideMouseCursor(true));
+        }
 
     }
 
@@ -133,8 +137,37 @@ public class HomePanel extends NCMPanel {
 
         boolean coverLoaded = false;
 
-        public PlaylistWidget(PlayList playList) {
+        private final int index;
+        private final long revealStart;
+        private boolean entranceDone = false;
+
+        private static final long ENTRANCE_STAGGER_MS = 35;
+        private static final long ENTRANCE_DURATION_MS = 450;
+        private static final int ENTRANCE_INDEX_CAP = 10;
+        private static final double ENTRANCE_SLIDE = 14;
+
+        public PlaylistWidget(PlayList playList, int index, long revealStart) {
             this.playList = playList;
+            this.index = index;
+            this.revealStart = revealStart;
+
+            this.setTransformations(() -> {
+                float ep = this.entranceProgress();
+                api.getGLStateManager().translate(0, (1f - ep) * ENTRANCE_SLIDE, 0);
+            });
+
+            this.setBeforeRenderCallback(() -> {
+                if (!entranceDone) {
+                    float ep = this.entranceProgress();
+                    if (ep >= 1f) {
+                        entranceDone = true;
+                        this.setAlpha(1f);
+                        this.setTransformations(null);
+                    } else {
+                        this.setAlpha(ep);
+                    }
+                }
+            });
 
             double size = 100;
             double emphasizeAnimMax = 5;
@@ -191,6 +224,22 @@ public class HomePanel extends NCMPanel {
         @Override
         public void onRender(double mouseX, double mouseY) {
 
+        }
+
+        private float entranceProgress() {
+            long delay = (long) (Math.min(index, ENTRANCE_INDEX_CAP) * ENTRANCE_STAGGER_MS);
+            long elapsed = System.currentTimeMillis() - revealStart - delay;
+
+            if (elapsed <= 0L) {
+                return 0f;
+            }
+            if (elapsed >= ENTRANCE_DURATION_MS) {
+                return 1f;
+            }
+
+            float t = elapsed / (float) ENTRANCE_DURATION_MS;
+            float inv = 1f - t;
+            return 1f - inv * inv * inv;
         }
 
         private void loadCover() {

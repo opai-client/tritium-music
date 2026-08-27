@@ -7,10 +7,12 @@ import tritium.interfaces.SharedRenderingConstants;
 import tritium.rendering.RGBA;
 import tritium.rendering.Rect;
 import tritium.rendering.rendersystem.RenderSystem;
+import tritium.rendering.shader.Shaders;
 import tritium.settings.ClientSettings;
 import tritium.utils.cursor.CursorUtils;
 
 import java.awt.*;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -68,6 +70,17 @@ public abstract class AbstractWidget<SELF extends AbstractWidget<SELF>> implemen
      */
     @Getter
     private final Bounds bounds = new Bounds();
+
+    private static volatile int LAYOUT_STAMP = 0;
+
+    private int posStamp = -1;
+    private int alphaStamp = -1;
+    private double cachedX, cachedY;
+    private float cachedAlpha;
+
+    private static void invalidateLayout() {
+        LAYOUT_STAMP++;
+    }
 
     /**
      * 渲染回调
@@ -144,6 +157,9 @@ public abstract class AbstractWidget<SELF extends AbstractWidget<SELF>> implemen
      * @param dWheel 滚轮
      */
     public void renderWidget(double mouseX, double mouseY, int dWheel) {
+
+        if (this.parent == null)
+            invalidateLayout();
 
         if (this.isHidden())
             return;
@@ -222,6 +238,9 @@ public abstract class AbstractWidget<SELF extends AbstractWidget<SELF>> implemen
 
     public void onTickReceived() {
 
+        if (this.parent == null)
+            invalidateLayout();
+
         if (this.onTick != null) {
             this.onTick.run();
         }
@@ -237,8 +256,8 @@ public abstract class AbstractWidget<SELF extends AbstractWidget<SELF>> implemen
      * @param children 子组件
      */
     public void addChild(AbstractWidget<?>... children) {
+        this.children.addAll(Arrays.asList(children));
         for (AbstractWidget<?> child : children) {
-            this.children.add(child);
             child.setParent(this);
         }
     }
@@ -299,6 +318,7 @@ public abstract class AbstractWidget<SELF extends AbstractWidget<SELF>> implemen
         this.getBounds().y = top;
         this.getBounds().width = this.getParentWidth() - left - right;
         this.getBounds().height = this.getParentHeight() - top - bottom;
+        invalidateLayout();
         return (SELF) this;
     }
 
@@ -311,6 +331,7 @@ public abstract class AbstractWidget<SELF extends AbstractWidget<SELF>> implemen
         this.getBounds().y -= expand;
         this.getBounds().width += expand * 2;
         this.getBounds().height += expand * 2;
+        invalidateLayout();
         return (SELF) this;
     }
 
@@ -578,10 +599,15 @@ public abstract class AbstractWidget<SELF extends AbstractWidget<SELF>> implemen
      */
     public float getAlpha() {
         // 与父组件的 alpha 相乘
-        if (this.getParent() != null)
-            return this.getParent().getAlpha() * this.alpha;
+        if (this.parent == null)
+            return this.alpha;
 
-        return this.alpha;
+        if (this.alphaStamp == LAYOUT_STAMP)
+            return this.cachedAlpha;
+
+        this.cachedAlpha = this.parent.getAlpha() * this.alpha;
+        this.alphaStamp = LAYOUT_STAMP;
+        return this.cachedAlpha;
     }
 
     /**
@@ -594,6 +620,7 @@ public abstract class AbstractWidget<SELF extends AbstractWidget<SELF>> implemen
     public SELF setAlpha(float alpha) {
         this.alpha = alpha;
         this.color = new Color(this.color.getRed(), this.color.getGreen(), this.color.getBlue(), (int) (alpha * 255));
+        invalidateLayout();
         return (SELF) this;
     }
 
@@ -613,10 +640,16 @@ public abstract class AbstractWidget<SELF extends AbstractWidget<SELF>> implemen
     public double getX() {
 
         // 如果父组件为空则直接返回 X 坐标
-        if (this.getParent() == null)
+        if (this.parent == null)
             return this.getBounds().x;
 
-        return this.getParent().getX() + this.getBounds().x;
+        if (this.posStamp == LAYOUT_STAMP)
+            return this.cachedX;
+
+        this.cachedX = this.parent.getX() + this.getBounds().x;
+        this.cachedY = this.parent.getY() + this.getBounds().y;
+        this.posStamp = LAYOUT_STAMP;
+        return this.cachedX;
     }
 
     /**
@@ -625,10 +658,16 @@ public abstract class AbstractWidget<SELF extends AbstractWidget<SELF>> implemen
     public double getY() {
 
         // 如果父组件为空则直接返回 Y 坐标
-        if (this.getParent() == null)
+        if (this.parent == null)
             return this.getBounds().y;
 
-        return this.getParent().getY() + this.getBounds().y;
+        if (this.posStamp == LAYOUT_STAMP)
+            return this.cachedY;
+
+        this.cachedX = this.parent.getX() + this.getBounds().x;
+        this.cachedY = this.parent.getY() + this.getBounds().y;
+        this.posStamp = LAYOUT_STAMP;
+        return this.cachedY;
     }
 
     /**
@@ -689,6 +728,7 @@ public abstract class AbstractWidget<SELF extends AbstractWidget<SELF>> implemen
         this.getBounds().y = y;
         this.getBounds().width = width;
         this.getBounds().height = height;
+        invalidateLayout();
         return (SELF) this;
     }
 
@@ -721,6 +761,7 @@ public abstract class AbstractWidget<SELF extends AbstractWidget<SELF>> implemen
     public SELF setPosition(double x, double y) {
         this.getBounds().x = x;
         this.getBounds().y = y;
+        invalidateLayout();
         return (SELF) this;
     }
 
@@ -730,9 +771,11 @@ public abstract class AbstractWidget<SELF extends AbstractWidget<SELF>> implemen
      * @param y Y 坐标
      */
     public SELF setPositionAbsolute(double x, double y) {
+        invalidateLayout();
         this.getBounds().x = this.getBounds().y = 0;
         this.getBounds().x = x - this.getX();
         this.getBounds().y = y - this.getY();
+        invalidateLayout();
         return (SELF) this;
     }
 
@@ -765,6 +808,7 @@ public abstract class AbstractWidget<SELF extends AbstractWidget<SELF>> implemen
      */
     public SELF setParent(AbstractWidget<?> parent) {
         this.parent = parent;
+        invalidateLayout();
         return (SELF) this;
     }
 

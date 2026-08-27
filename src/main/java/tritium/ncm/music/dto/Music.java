@@ -67,6 +67,10 @@ public class Music {
         return Location.of("tritium/textures/music/" + this.id + "/cover_small.png");
     }
 
+    public final Location getGridCoverLocation() {
+        return Location.of("tritium/textures/music/" + this.id + "/cover_grid.png");
+    }
+
     public String getArtistsName() {
         if (this.artistsName == null) {
             this.artistsName = this.buildArtistsNames();

@@ -21,6 +21,7 @@ import tritium.rendering.font.CFontRenderer;
 import tritium.rendering.texture.ITextureObject;
 import tritium.screens.ncm.LyricLine;
 import tritium.utils.Location;
+import tritium.utils.I18n;
 import tritium.utils.Tuple;
 import tritium.utils.WidgetWrapper;
 
@@ -170,7 +171,7 @@ public class MusicInfoWidget extends ExtensionModule implements SharedConstants,
 
                 CFontRenderer fr = FontManager.pf18bold;
 
-                fr.drawString("Downloading...", imgX, offsetY, new Color(1, 1, 1, downloadPanelAlpha).getRGB());
+                fr.drawString(I18n.get("tritium-music.ui.download.downloading"), imgX, offsetY, new Color(1, 1, 1, downloadPanelAlpha).getRGB());
                 fr.drawString(downloadSpeed, imgX + width - imgSpacing * 2 - fr.getWidth(downloadSpeed), offsetY, new Color(1, 1, 1, downloadPanelAlpha).getRGB());
 
                 this.roundedRect(imgX, offsetY + fr.getHeight() + 4, width - imgSpacing * 2, 6, 2, 1, 1, 1, downloadPanelAlpha * 0.25f);
