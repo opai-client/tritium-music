@@ -538,7 +538,7 @@ public class MusicLyricsPanel implements SharedRenderingConstants, SharedConstan
                                 FontManager.pf28bold.drawCenteredStringVertical("Base Texture", spacing + 8, spacing + fbHeight * .25, -1);
 
                                 api.getGLStateManager().bindTexture(stencilFb.framebufferTexture);
-                                ShaderProgram.drawQuadFlipped(xOff, spacing + fbHeight * .5 + 20, fbWidth * .5, fbHeight * .5);
+                                ShaderProgram.drawQuadFlipped(xOff, spacing + fbHeight * .5 + 20, allocW * .5, fbHeight * .5);
 
                                 FontManager.pf28bold.drawCenteredStringVertical("Stencil Texture", spacing + 8, spacing + fbHeight * .5 + 20 + fbHeight * .25, -1);
 

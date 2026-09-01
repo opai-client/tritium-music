@@ -62,14 +62,17 @@ public class Reflection {
         api.registerEvent(handler);
     }
 
-    Class<?> DYN_1, DynamicIslandClass, DynamicIslandEntity, ResourceLocation,
+    Class<?> OldServerPingerClass, DynamicIslandRendererClass, DynamicIslandEntity, ResourceLocation,
                     IResourcePack, DefaultResourcePack;
 
     public void initDynIsland() {
 
         try {
 
-            DYN_1 = ClassFinder.finder()
+            // Opai 的动态岛渲染器类里有一个 OldServerPinger 的字段
+            // 我们需要找到这个类并在寻找动态岛渲染器的时候使用它来定位动态岛渲染器
+            // Opai b26.39: MatrixShield/Ik
+            OldServerPingerClass = ClassFinder.finder()
 
                     .addField(List.class, PRIVATE | FINAL)
                     .addField(Gson.class, PRIVATE | STATIC | FINAL)
@@ -80,11 +83,13 @@ public class Reflection {
                     .find();
 
             if (debug)
-                System.out.println("Found DYN_1: " + DYN_1.getName());
+                System.out.println("Found OldServerPingerClass: " + OldServerPingerClass.getName());
 
-            DynamicIslandClass = ClassFinder.finder()
+            // 动态岛渲染器类
+            // Opai b26.39: MatrixShield/fr
+            DynamicIslandRendererClass = ClassFinder.finder()
 
-                    .addField(DYN_1, PRIVATE | FINAL)
+                    .addField(OldServerPingerClass, PRIVATE | FINAL)
                     .addField(Object.class, PRIVATE | FINAL)
 
                     .addMethod(boolean.class, PUBLIC)
@@ -93,16 +98,38 @@ public class Reflection {
                     .find();
 
             if (debug)
-                System.out.println("Found DynamicIslandClass: " + DynamicIslandClass.getName());
+                System.out.println("Found DynamicIslandClass: " + DynamicIslandRendererClass.getName());
 
+            // 方块人原版的 ResourceLocation 类
+            // 动态岛的条目的 svg 图标使用了 ResourceLocation, 我们需要这个类来定位动态岛的条目类
+            // Opai b26.39: MatrixShield/als
             ResourceLocation = CommonReflectionClasses.ResourceLocation.get();
+
             if (debug)
                 System.out.println("Found ResourceLocation: " + ResourceLocation.getName());
 
+            // 动态岛条目类
+            // 它的类看起来长这样
+            //
+            // class DynamicIslandItem {
+            //    ResourceLocation icon;
+            //    final /* synthetic */ DynamicIslandRenderer renderer;
+            //    String text;
+            //    Color color;
+            //
+            //    public fs(DynamicIslandRenderer renderer, ResourceLocation icon, Color color, String text, int n) {
+            //        this.renderer = renderer;
+            //        this.icon = icon;
+            //        this.color = color;
+            //        this.text = text;
+            //    }
+            // }
+            //
+            // Opai b26.39: MatrixShield/fs
             DynamicIslandEntity = ClassFinder.finder()
 
                     .setStrictMode(ClassFinder.Finder.StrictMode.Fields)
-                    .addField(DynamicIslandClass, DONT_CARE)
+                    .addField(DynamicIslandRendererClass, DONT_CARE)
                     .addField(String.class, DONT_CARE)
                     .addField(Color.class, DONT_CARE)
                     .addField(ResourceLocation, DONT_CARE)
@@ -112,6 +139,9 @@ public class Reflection {
             if (debug)
                 System.out.println("Found DynamicIslandEntity: " + DynamicIslandEntity.getName());
 
+            // 方块人的 IResourcePack 类
+            // 用于定位下面的 DefaultResourcePack 类
+            // Opai b26.39: MatrixShield/PM
             IResourcePack = ClassFinder.finder()
 
                     .setInterface()
@@ -128,6 +158,9 @@ public class Reflection {
             if (debug)
                 System.out.println("Found IResourcePack: " + IResourcePack.getName());
 
+            // 方块人的 DefaultResourcePack 类
+            // 我们需要修补这个类的字节码来为我们自己的动态岛图标的 ResourceLocation 返回正确的资源
+            // Opai b26.39: MatrixShield/PA
             DefaultResourcePack = ClassFinder.finder()
 
                     .implementsClass(IResourcePack)
@@ -150,11 +183,15 @@ public class Reflection {
 
             Instrumentation inst = NativeInstrumentation.getInstance();
 
-            byte[] transformedDynIsland = transformDynIsland(DynamicIslandClass, DynamicIslandEntity, ResourceLocation);
+            // 对动态岛渲染器和 DefaultResourcePack 进行修补
+            byte[] transformedDynamicIslandRenderer = transformDynIsland();
+            byte[] transformedDefaultResourcePack = transformDefaultResourcePack();
 
 //            Files.write(new File("D:\\DynIsland.class").toPath(), transformedDynIsland, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
-
-            inst.redefineClasses(new ClassDefinition(DynamicIslandClass, transformedDynIsland), new ClassDefinition(DefaultResourcePack, transformDefaultResourcePack()));
+            inst.redefineClasses(
+                    new ClassDefinition(DynamicIslandRendererClass, transformedDynamicIslandRenderer),
+                    new ClassDefinition(DefaultResourcePack, transformedDefaultResourcePack)
+            );
 
             DYNAMIC_ISLAND_SUPPORTED = true;
         } catch (Exception e) {
@@ -165,10 +202,10 @@ public class Reflection {
 
     public void restoreDynIsland() {
         try {
-            byte[] classBytes = ReflectionUtils.getClassBytes(DynamicIslandClass);
+            byte[] classBytes = ReflectionUtils.getClassBytes(DynamicIslandRendererClass);
 
             Instrumentation inst = NativeInstrumentation.getInstance();
-            inst.redefineClasses(new ClassDefinition(DynamicIslandClass, classBytes));
+            inst.redefineClasses(new ClassDefinition(DynamicIslandRendererClass, classBytes));
             DYNAMIC_ISLAND_SUPPORTED = true;
         } catch (Exception e) {
             LOGGER.warn("Failed to transform watermark class!", e);
@@ -224,9 +261,9 @@ public class Reflection {
         return classWriter.toByteArray();
     }
 
-    public byte[] transformDynIsland(Class<?> DynamicIsland, Class<?> entityClass, Class<?> ResourceLocation) {
+    public byte[] transformDynIsland() {
 
-        byte[] origIn = ReflectionUtils.getClassBytes(DynamicIsland);
+        byte[] origIn = ReflectionUtils.getClassBytes(DynamicIslandRendererClass);
 
         ClassReader classReader = new ClassReader(origIn);
         ClassWriter classWriter = new ClassWriter(classReader, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
@@ -236,6 +273,9 @@ public class Reflection {
             @Override
             public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
                 MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
+
+                // 判断这个方法是不是我们要 transform 的方法
+                // 其实这个方法的签名是 public boolean I(pr pr2, aP aP2) 但是我直接偷懒了用的 ;)Z
                 if (descriptor.endsWith(";)Z")) {
                     return new MethodVisitor(ASM9, mv) {
 
@@ -246,6 +286,8 @@ public class Reflection {
                         public void visitVarInsn(int opcode, int varIndex) {
                             super.visitVarInsn(opcode, varIndex);
 
+                            // 在 fstore f7 之后插入我们的逻辑
+                            // 也就是 float f = Float.intBitsToFloat(0x40C00000); 之后
                             if (opcode == FSTORE && varIndex == 7 && !visited) {
                                 this.visited = true;
 
@@ -254,6 +296,7 @@ public class Reflection {
                                 Label innerLabel = new Label();
                                 Label outerLabel = new Label();
 
+                                // 一些魔法数字
                                 // new local var index
                                 int vIndex = 10;
                                 // dyn island entity list var index
@@ -299,7 +342,7 @@ public class Reflection {
                                 {
                                     mv.visitLabel(outerLabel);
                                     mv.visitVarInsn(ALOAD, listIndex);
-                                    String entityClassName = entityClass.getName().replace(".", "/");
+                                    String entityClassName = DynamicIslandEntity.getName().replace(".", "/");
                                     String resourceLocationName = ResourceLocation.getName().replace(".", "/");
 
                                     // Entity aEntity = new Entity(dynIslandInstance, svgResourceLocation, new Color(56, 93, 56), <lyrics string>, <unknown integer>);
@@ -324,7 +367,7 @@ public class Reflection {
                                     mv.visitLdcInsn(-1816927672);
                                     mv.visitMethodInsn(INVOKESPECIAL, entityClassName, "<init>", String.format(
                                             "(L%s;L%s;Ljava/awt/Color;Ljava/lang/String;I)V",
-                                            DynamicIsland.getName().replace(".", "/"),
+                                            DynamicIslandRendererClass.getName().replace(".", "/"),
                                             resourceLocationName
                                     ), false);
                                     // aEntityList.add(aEntity);
